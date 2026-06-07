@@ -24,6 +24,10 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
+    <!-- KaTeX for Perfect Mathematical Formulas -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+
     <!-- FontAwesome for Apple-like Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -38,7 +42,7 @@
             background: #ffffff;
             cursor: pointer;
             transition: transform 0.1s ease, background 0.1s ease;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
         input[type="range"]::-webkit-slider-thumb:hover {
             transform: scale(1.2);
@@ -51,11 +55,11 @@
             background: #000000;
         }
         ::-webkit-scrollbar-thumb {
-            background: #333336;
+            background: #2c2c2e;
             border-radius: 3px;
         }
         ::-webkit-scrollbar-thumb:hover {
-            background: #44444a;
+            background: #3a3a3c;
         }
     </style>
 </head>
@@ -66,6 +70,24 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
+        // React LaTeX 渲染輔助組件
+        function Latex({ math, block = false }) {
+            const containerRef = useRef(null);
+            useEffect(() => {
+                if (containerRef.current && window.katex) {
+                    try {
+                        window.katex.render(math, containerRef.current, {
+                            displayMode: block,
+                            throwOnError: false
+                        });
+                    } catch (e) {
+                        containerRef.current.textContent = math;
+                    }
+                }
+            }, [math, block]);
+            return <span ref={containerRef} />;
+        }
+
         function App() {
             // === 系統狀態 (使用者控制項) ===
             const [v0Kmh, setV0Kmh] = useState(565); // 初速 km/h
@@ -74,44 +96,124 @@
             const [isPlaying, setIsPlaying] = useState(true);
             
             // 3D 相機旋轉控制
-            const [cameraYaw, setCameraYaw] = useState(25); // 左右偏航角 (deg)
-            const [cameraPitch, setCameraPitch] = useState(15); // 上下俯仰角 (deg)
+            const defaultYaw = 72;  
+            const defaultPitch = 10; 
+            const [cameraYaw, setCameraYaw] = useState(defaultYaw); 
+            const [cameraPitch, setCameraPitch] = useState(defaultPitch); 
             
             // 風力控制
-            const [windSpeed, setWindSpeed] = useState(0); // 風速 m/s
-            const [windDir, setWindDir] = useState(180); // 風向角度 (0: 順風, 180: 逆風, 90/270: 側風)
+            const [windSpeed, setWindSpeed] = useState(0); 
+            const [windDir, setWindDir] = useState(180); 
 
-            // Canvas 參照
+            // 簡報 Slide 控制
+            const [activeSlide, setActiveSlide] = useState(0);
+
+            // Canvas 與滑鼠交互參照
             const mainCanvasRef = useRef(null);
             const chartCanvasRef = useRef(null);
+            const energyCanvasRef = useRef(null); // 新增：動能與面積變化圖
             const animationRef = useRef(null);
             const progressRef = useRef(0);
+            
+            // 用於拖拽相機的狀態
+            const isDraggingRef = useRef(false);
+            const previousMousePosition = useRef({ x: 0, y: 0 });
+
+            // === 氣流 3D 粒子陣列 ===
+            const windParticles = useMemo(() => {
+                const arr = [];
+                for(let i=0; i<30; i++) {
+                    arr.push({
+                        x: (Math.random() - 0.5) * 6,
+                        y: Math.random() * 4,
+                        z: Math.random() * 13.4,
+                        speedFactor: 0.2 + Math.random() * 0.8
+                    });
+                }
+                return arr;
+            }, []);
+
+            // === 簡報內容定義 ===
+            const slides = [
+                {
+                    title: "1. 極速彈射與動能特徵",
+                    icon: "fa-rocket",
+                    text: "2023年印度雙打名將 Rankireddy 擊出 565 km/h 驚人初速，打破金氏世界紀錄。根據古典力學，此瞬間拍面轉移給羽球極大的初始動能：",
+                    formula: "E_k = \\frac{1}{2} m v^2",
+                    conclusion: "標準羽球質量僅 5.2g，極輕的質量帶來驚人的初速度，但也意味著其運動慣性極低，極易在短距離內被高阻力消耗殆盡。",
+                    setup: { v0: 565, tension: 32, material: 'natural' }
+                },
+                {
+                    title: "2. 生物力學：鞭打動力鏈",
+                    icon: "fa-child-reaching",
+                    text: "擊球瞬間手臂宛如鞭梢。地心引力向上的能量通過核心肌群抗旋轉傳導，再經由肩膀、手肘，最後由手腕進行極速內旋 (Pronation)。手腕末端角速度與扭矩滿足以下動態關係：",
+                    formula: "\\tau = I \\alpha = I \\frac{d\\omega}{dt}",
+                    conclusion: "這套動力鏈將人體的大肌肉群動能完美匯聚，最後集中至擊球點，釋放出超越一級方程式賽車的極限終端速度。",
+                    setup: { v0: 420, tension: 28, material: 'natural' }
+                },
+                {
+                    title: "3. 空氣阻力牆與非線性衰減",
+                    icon: "fa-wind",
+                    text: "羽球獨特的錐狀結構使其成為所有球類運動中阻力係數 (Cd) 的上限。流場中空氣阻力與速度的平方成正比：",
+                    formula: "F_d = \\frac{1}{2} \\rho v^2 C_d A(v)",
+                    conclusion: "高達 565 km/h 的超高初速會撞擊出強烈的「高壓駐點（空氣阻力牆）」，使能量呈指數級衰減，過網抵達防守球員時已降至 100 km/h 以下，使防守成為可能。",
+                    setup: { v0: 565, tension: 32, material: 'natural' }
+                },
+                {
+                    title: "4. 拍線床的蹦床效應",
+                    icon: "fa-border-all",
+                    text: "在約 1/1000 秒的極短擊球接觸時間內，高張力拍線（28-32磅）產生極限凹陷形變，將碰撞動能轉化為高密度的彈性位能：",
+                    formula: "E_{elastic} = \\frac{1}{2} k \\Delta x^2",
+                    conclusion: "奈米聚合物編織的高抗張線床如同超級彈簧，反彈時幾乎無損地將彈性位能 100% 灌注至羽球軟木托上，彈射而出。",
+                    setup: { v0: 480, tension: 34, material: 'natural' }
+                },
+                {
+                    title: "5. 裙襬氣動彈性收縮機制",
+                    icon: "fa-compress",
+                    text: "天然羽毛球具備完美的氣動自我適應結構（Aeroelasticity）。在高風壓下，16根鵝毛向內收縮，大幅減小正面迎風面積 A：",
+                    formula: "A(v) = A_{min} + (A_0 - A_{min}) \\cdot e^{-\\kappa \\cdot v^2}",
+                    conclusion: "出球瞬間羽毛向內緊縮如同子彈，風阻驟降以維持超高初速；當風壓減弱，羽毛剛性使裙襬重新張開，恢復最大空氣阻力以穩定落點。這也是尼龍球（剛性不變）無法比擬之處。",
+                    setup: { v0: 565, tension: 32, material: 'natural' }
+                }
+            ];
+
+            const applySlideSetup = (slideIndex) => {
+                const conf = slides[slideIndex].setup;
+                setV0Kmh(conf.v0);
+                setTension(conf.tension);
+                setMaterial(conf.material);
+                setActiveSlide(slideIndex);
+                progressRef.current = 0; 
+            };
+
+            const handleResetView = () => {
+                setCameraYaw(defaultYaw);
+                setCameraPitch(defaultPitch);
+            };
 
             // === 物理引擎核心 (常微分方程 ODE 數值模擬) ===
             const simulationData = useMemo(() => {
-                const m = 0.0052; // 羽球質量 (5.2克)
-                const rho = 1.225; // 空氣密度 (kg/m^3)
-                const Cd_base = 0.62; // 基礎風阻
-                const A0 = 0.0035; // 正常裙襬面積
-                const Amin = 0.0017; // 收縮極限面積
+                const m = 0.0052; 
+                const rho = 1.225; 
+                const Cd_base = 0.62; 
+                const A0 = 0.0035; 
+                const Amin = 0.0017; 
                 const g = 9.81; 
-                const dt = 0.0015; // 超高解析度步長
+                const dt = 0.0015; 
 
                 let t = 0;
-                let v_mag = v0Kmh / 3.6; // 轉換為 m/s
+                let v_mag = v0Kmh / 3.6; 
                 
-                // 動態切角 (初速越快，下壓角度越陡)
                 let angle = -1 * (4 + (v0Kmh / 600) * 12) * (Math.PI / 180); 
                 
-                let vz = v_mag * Math.cos(angle); // Z: 球場縱向
-                let vy = v_mag * Math.sin(angle); // Y: 高度方向
-                let vx = 0; // X: 球場橫向
+                let vz = v_mag * Math.cos(angle); 
+                let vy = v_mag * Math.sin(angle); 
+                let vx = 0; 
                 
                 let z = 0;
-                let y = 3.15; // 擊球點高度 (起跳最高點)
+                let y = 3.15; 
                 let x = 0; 
 
-                // 風速向量分量
                 const windRad = (windDir * Math.PI) / 180;
                 const wx = windSpeed * Math.sin(windRad);
                 const wz = windSpeed * Math.cos(windRad);
@@ -120,13 +222,11 @@
                 let maxDrag = 0;
 
                 while (y >= 0 && z <= 15) {
-                    // 1. 計算相對風速 (動態氣動學基礎)
                     const vrx = vx - wx;
                     const vry = vy;
                     const vrz = vz - wz;
                     const vr_mag = Math.sqrt(vrx * vrx + vry * vry + vrz * vrz);
 
-                    // 2. 裙襬形變函數 (天然羽毛具備指數形收縮特性)
                     let A = A0;
                     if (material === 'natural') {
                         A = Amin + (A0 - Amin) * Math.exp(-0.00035 * vr_mag * vr_mag);
@@ -134,16 +234,13 @@
                         A = A0 * 0.88 + (A0 * 0.12) * Math.exp(-0.00012 * vr_mag * vr_mag);
                     }
 
-                    // 3. 計算即時阻力
                     const Fd = 0.5 * rho * vr_mag * vr_mag * Cd_base * A;
                     if (Fd > maxDrag) maxDrag = Fd;
 
-                    // 4. ODE 加速度分量
                     const ax = -(Fd / m) * (vrx / vr_mag);
                     const ay = -g - (Fd / m) * (vry / vr_mag);
                     const az = -(Fd / m) * (vrz / vr_mag);
 
-                    // 5. 數值積分 (經典歐拉法)
                     vx += ax * dt;
                     vy += ay * dt;
                     vz += az * dt;
@@ -152,31 +249,54 @@
                     z += vz * dt;
 
                     v_mag = Math.sqrt(vx * vx + vy * vy + vz * vz);
+                    const kineticEnergy = 0.5 * m * v_mag * v_mag;
                     t += dt;
 
-                    // 每隔固定步長採樣，供圖表與 Canvas 動畫使用
                     if (Math.floor(t * 10000) % 30 === 0) {
                         data.push({
                             time: t,
-                            x: x,
-                            y: y,
-                            z: z,
+                            x: x, y: y, z: z,
                             speed: v_mag * 3.6,
                             drag: Fd,
-                            area: A
+                            area: A,
+                            kineticEnergy: kineticEnergy
                         });
                     }
                 }
                 return { data, maxDrag };
             }, [v0Kmh, material, windSpeed, windDir]);
 
-            // === 3D 渲染與圖表繪製 ===
+            // === 3D 畫布與滑鼠拖拽交互處理 ===
+            const handleMouseDown = (e) => {
+                isDraggingRef.current = true;
+                previousMousePosition.current = { x: e.clientX, y: e.clientY };
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDraggingRef.current) return;
+                const deltaX = e.clientX - previousMousePosition.current.x;
+                const deltaY = e.clientY - previousMousePosition.current.y;
+
+                setCameraYaw(prev => {
+                    const next = prev - deltaX * 0.5;
+                    return next > 90 ? 90 : next < -90 ? -90 : next;
+                });
+                setCameraPitch(prev => {
+                    const next = prev - deltaY * 0.3;
+                    return next > 45 ? 45 : next < 5 ? 5 : next;
+                });
+
+                previousMousePosition.current = { x: e.clientX, y: e.clientY };
+            };
+
+            const handleMouseUpOrLeave = () => { isDraggingRef.current = false; };
+
+            // === 3D 渲染核心 ===
             useEffect(() => {
                 const canvas = mainCanvasRef.current;
                 const ctx = canvas.getContext('2d');
                 const traj = simulationData.data;
                 
-                // 處理高難度 High-DPI Retina 顯示器模糊問題
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
                 canvas.width = rect.width * dpr;
@@ -185,68 +305,91 @@
                 const width = rect.width;
                 const height = rect.height;
 
-                // 3D 仿射變換投影矩陣 (極致專業)
                 const project = (x, y, z) => {
-                    const scale = width * 0.052; 
+                    const scale = width * 0.054; 
                     const offsetX = width * 0.5;
-                    const offsetY = height * 0.65;
+                    const offsetY = height * 0.64;
                     
                     const radYaw = (cameraYaw * Math.PI) / 180;
                     const radPitch = (cameraPitch * Math.PI) / 180;
 
-                    // 圍繞 Y 軸 (Yaw) 與 X 軸 (Pitch) 旋轉
-                    // 旋轉後的座標
-                    const rotX = x * Math.cos(radYaw) - z * Math.sin(radYaw);
-                    const rotZ = x * Math.sin(radYaw) + z * Math.cos(radYaw);
-                    
-                    const finalY = y * Math.cos(radPitch) - rotZ * Math.sin(radPitch);
-                    const finalZ = y * Math.sin(radPitch) + rotZ * Math.cos(radPitch);
+                    const cx = x;
+                    const cy = y;
+                    const cz = z - 6.7; 
 
-                    // 透視投影效果
-                    const perspective = 1000 / (1000 + finalZ * scale * 0.3);
+                    let rotX = cx * Math.cos(radYaw) - cz * Math.sin(radYaw);
+                    let rotZ = cx * Math.sin(radYaw) + cz * Math.cos(radYaw);
+                    
+                    const finalY = cy * Math.cos(radPitch) + rotZ * Math.sin(radPitch);
+                    const finalZ = -cy * Math.sin(radPitch) + rotZ * Math.cos(radPitch);
+
+                    const distance = 16; 
+                    const perspective = distance / (distance + finalZ);
                     const px = offsetX + rotX * scale * perspective;
                     const py = offsetY - finalY * scale * perspective;
 
                     return { px, py, perspective };
                 };
 
-                // 繪製極簡科技感羽球場
+                const drawWindParticles = () => {
+                    ctx.fillStyle = 'rgba(10, 132, 255, 0.15)';
+                    const windRad = (windDir * Math.PI) / 180;
+                    const wx = windSpeed * Math.sin(windRad) * 0.05;
+                    const wz = windSpeed * Math.cos(windRad) * 0.05;
+
+                    windParticles.forEach(p => {
+                        p.x += wx * p.speedFactor;
+                        p.z += wz * p.speedFactor;
+
+                        if (p.z > 13.4) p.z = 0;
+                        if (p.z < 0) p.z = 13.4;
+                        if (p.x > 4) p.x = -4;
+                        if (p.x < -4) p.x = 4;
+
+                        const pos = project(p.x, p.y, p.z);
+                        ctx.beginPath();
+                        ctx.arc(pos.px, pos.py, 1.5 * pos.perspective, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                };
+
                 const drawCourt = () => {
                     ctx.shadowBlur = 0;
                     ctx.lineWidth = 1;
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-
-                    // 定義羽球場立體線條組
-                    const lines = [
-                        // 雙打外框
-                        [{x: -3.05, z: 0}, {x: 3.05, z: 0}, {x: 3.05, z: 13.4}, {x: -3.05, z: 13.4}],
-                        // 單打內框
-                        [{x: -2.59, z: 0}, {x: 2.59, z: 0}, {x: 2.59, z: 13.4}, {x: -2.59, z: 13.4}],
-                        // 中線
-                        [{x: 0, z: 0}, {x: 0, z: 13.4}],
-                        // 雙打後發球線
-                        [{x: -3.05, z: 0.76}, {x: 3.05, z: 0.76}],
-                        [{x: -3.05, z: 12.64}, {x: 3.05, z: 12.64}],
-                        // 前發球線
-                        [{x: -3.05, z: 1.98}, {x: 3.05, z: 1.98}],
-                        [{x: -3.05, z: 11.42}, {x: 3.05, z: 11.42}],
-                    ];
-
-                    // 1. 繪製草綠色微光地面填充
-                    ctx.fillStyle = 'rgba(48, 209, 88, 0.02)';
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+                    
+                    ctx.fillStyle = 'rgba(13, 85, 52, 0.2)';
                     ctx.beginPath();
-                    const p1 = project(-3.05, 0, 0);
-                    const p2 = project(3.05, 0, 0);
-                    const p3 = project(3.05, 0, 13.4);
-                    const p4 = project(-3.05, 0, 13.4);
-                    ctx.moveTo(p1.px, p1.py);
-                    ctx.lineTo(p2.px, p2.py);
-                    ctx.lineTo(p3.px, p3.py);
-                    ctx.lineTo(p4.px, p4.py);
+                    const c1 = project(-3.05, 0, 0);
+                    const c2 = project(3.05, 0, 0);
+                    const c3 = project(3.05, 0, 13.4);
+                    const c4 = project(-3.05, 0, 13.4);
+                    ctx.moveTo(c1.px, c1.py); ctx.lineTo(c2.px, c2.py);
+                    ctx.lineTo(c3.px, c3.py); ctx.lineTo(c4.px, c4.py);
                     ctx.closePath();
                     ctx.fill();
 
-                    // 2. 繪製格線
+                    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(c1.px, c1.py); ctx.lineTo(c2.px, c2.py);
+                    ctx.lineTo(c3.px, c3.py); ctx.lineTo(c4.px, c4.py);
+                    ctx.closePath();
+                    ctx.stroke();
+
+                    const lines = [
+                        [{x: -2.59, z: 0}, {x: -2.59, z: 13.4}],
+                        [{x: 2.59, z: 0}, {x: 2.59, z: 13.4}],
+                        [{x: -3.05, z: 1.98}, {x: 3.05, z: 1.98}],
+                        [{x: -3.05, z: 11.42}, {x: 3.05, z: 11.42}],
+                        [{x: -3.05, z: 0.76}, {x: 3.05, z: 0.76}],
+                        [{x: -3.05, z: 12.64}, {x: 3.05, z: 12.64}],
+                        [{x: 0, z: 0}, {x: 0, z: 1.98}],
+                        [{x: 0, z: 11.42}, {x: 0, z: 13.4}]
+                    ];
+
+                    ctx.lineWidth = 1;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
                     lines.forEach(pts => {
                         ctx.beginPath();
                         pts.forEach((pt, i) => {
@@ -254,13 +397,11 @@
                             if (i === 0) ctx.moveTo(px, py);
                             else ctx.lineTo(px, py);
                         });
-                        if (pts.length > 2) ctx.closePath();
                         ctx.stroke();
                     });
 
-                    // 3. 繪製半透網面
                     ctx.fillStyle = 'rgba(10, 132, 255, 0.08)';
-                    ctx.strokeStyle = 'rgba(10, 132, 255, 0.3)';
+                    ctx.strokeStyle = 'rgba(10, 132, 255, 0.25)';
                     ctx.beginPath();
                     const n1 = project(-3.05, 0, 6.7);
                     const n2 = project(3.05, 0, 6.7);
@@ -272,8 +413,17 @@
                     ctx.fill();
                     ctx.stroke();
 
-                    // 網柱
-                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = 'rgba(10, 132, 255, 0.04)';
+                    for(let i=1; i<10; i++) {
+                        const ratio = i / 10;
+                        const hStart = project(-3.05, 1.55 * ratio, 6.7);
+                        const hEnd = project(3.05, 1.55 * ratio, 6.7);
+                        ctx.beginPath();
+                        ctx.moveTo(hStart.px, hStart.py); ctx.lineTo(hEnd.px, hEnd.py);
+                        ctx.stroke();
+                    }
+
+                    ctx.lineWidth = 3;
                     ctx.strokeStyle = '#0A84FF';
                     ctx.beginPath();
                     ctx.moveTo(n1.px, n1.py); ctx.lineTo(n4.px, n4.py);
@@ -281,12 +431,10 @@
                     ctx.stroke();
                 };
 
-                // 繪製動態飛行線路與殘影粒子
                 const drawTrajectory = (idx) => {
                     if (traj.length === 0) return;
                     const maxIdx = Math.min(idx, traj.length - 1);
 
-                    // 1. 繪製完整的彈道殘影 (霓虹發光線)
                     ctx.beginPath();
                     for (let i = 0; i <= maxIdx; i++) {
                         const pt = traj[i];
@@ -295,66 +443,48 @@
                         else ctx.lineTo(px, py);
                     }
                     ctx.strokeStyle = '#30D158';
-                    ctx.lineWidth = 2;
-                    ctx.shadowBlur = 10;
+                    ctx.lineWidth = 2.5;
+                    ctx.shadowBlur = 12;
                     ctx.shadowColor = '#30D158';
                     ctx.stroke();
-                    ctx.shadowBlur = 0; // 釋放發光，避免卡頓
+                    ctx.shadowBlur = 0; 
 
-                    // 2. 繪製地面的影子投影
-                    ctx.beginPath();
-                    for (let i = 0; i <= maxIdx; i += 2) {
-                        const pt = traj[i];
-                        const { px, py } = project(pt.x, 0, pt.z);
-                        if (i === 0) ctx.moveTo(px, py);
-                        else ctx.lineTo(px, py);
-                    }
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-                    ctx.lineWidth = 1;
-                    ctx.stroke();
-
-                    // 3. 當前球體本體與高度指示線
                     const current = traj[maxIdx];
                     const cPos = project(current.x, current.y, current.z);
                     const sPos = project(current.x, 0, current.z);
 
-                    // 高度輔助虛線
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                    ctx.setLineDash([3, 3]);
+                    ctx.setLineDash([4, 4]);
                     ctx.beginPath();
                     ctx.moveTo(cPos.px, cPos.py);
                     ctx.lineTo(sPos.px, sPos.py);
                     ctx.stroke();
-                    ctx.setLineDash([]); // 還原
+                    ctx.setLineDash([]); 
 
-                    // 地面影子
-                    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+                    ctx.fillStyle = 'rgba(0,0,0,0.6)';
                     ctx.beginPath();
-                    ctx.arc(sPos.px, sPos.py, 5 * cPos.perspective, 0, Math.PI * 2);
+                    ctx.arc(sPos.px, sPos.py, 6 * cPos.perspective, 0, Math.PI * 2);
                     ctx.fill();
 
-                    // 亮白色球點 (Apple Glow Style)
                     ctx.fillStyle = '#FFFFFF';
                     ctx.shadowBlur = 15;
                     ctx.shadowColor = '#FFFFFF';
                     ctx.beginPath();
-                    ctx.arc(cPos.px, cPos.py, 4.5 * cPos.perspective, 0, Math.PI * 2);
+                    ctx.arc(cPos.px, cPos.py, 5 * cPos.perspective, 0, Math.PI * 2);
                     ctx.fill();
                     ctx.shadowBlur = 0;
                 };
 
-                // 動畫渲染環
                 const render = () => {
-                    ctx.fillStyle = '#000000';
+                    ctx.fillStyle = '#070708';
                     ctx.fillRect(0, 0, width, height);
 
                     drawCourt();
+                    if (windSpeed > 0) drawWindParticles();
 
                     if (isPlaying && traj.length > 0) {
                         progressRef.current += 1;
-                        if (progressRef.current >= traj.length) {
-                            progressRef.current = 0;
-                        }
+                        if (progressRef.current >= traj.length) progressRef.current = 0;
                     }
 
                     drawTrajectory(progressRef.current);
@@ -362,12 +492,10 @@
                 };
 
                 render();
-
                 return () => cancelAnimationFrame(animationRef.current);
-            }, [simulationData, isPlaying, cameraYaw, cameraPitch]);
+            }, [simulationData, isPlaying, cameraYaw, cameraPitch, windSpeed, windDir]);
 
-
-            // === 副 Canvas 自繪圖表 (極速與阻力關聯圖) ===
+            // === 模擬圖一：速度與阻力曲線 ===
             useEffect(() => {
                 const canvas = chartCanvasRef.current;
                 const ctx = canvas.getContext('2d');
@@ -382,299 +510,400 @@
                 const h = rect.height;
 
                 ctx.clearRect(0,0,w,h);
-
                 if (traj.length === 0) return;
 
-                // 自繪精美數據曲線
-                const padding = 35;
+                const padding = 30;
                 const graphW = w - padding * 2;
-                const graphH = h - padding * 2;
+                const graphH = h - padding - 15;
 
-                // 畫背景格線
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
                 ctx.lineWidth = 1;
                 for (let i = 0; i <= 4; i++) {
-                    const y = padding + (graphH / 4) * i;
+                    const y = 15 + (graphH / 4) * i;
                     ctx.beginPath();
                     ctx.moveTo(padding, y);
                     ctx.lineTo(w - padding, y);
                     ctx.stroke();
                 }
 
-                // 繪製速度曲線 (紫色)
+                // 速度線 (紫色)
                 ctx.beginPath();
                 traj.forEach((pt, idx) => {
                     const xCoord = padding + (pt.z / 13.4) * graphW;
-                    const yCoord = padding + graphH - (pt.speed / 600) * graphH;
+                    const yCoord = 15 + graphH - (pt.speed / 600) * graphH;
                     if (idx === 0) ctx.moveTo(xCoord, yCoord);
                     else ctx.lineTo(xCoord, yCoord);
                 });
                 ctx.strokeStyle = '#BF5AF2';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 2.5;
                 ctx.stroke();
 
-                // 繪製阻力曲線 (紅色)
+                // 阻力線 (紅色)
                 ctx.beginPath();
                 traj.forEach((pt, idx) => {
                     const xCoord = padding + (pt.z / 13.4) * graphW;
-                    // 假設最高阻力比例為 40N
-                    const yCoord = padding + graphH - (pt.drag / 40) * graphH;
+                    const yCoord = 15 + graphH - (pt.drag / 40) * graphH;
                     if (idx === 0) ctx.moveTo(xCoord, yCoord);
                     else ctx.lineTo(xCoord, yCoord);
                 });
                 ctx.strokeStyle = '#FF453A';
-                ctx.lineWidth = 1.5;
+                ctx.lineWidth = 1.8;
                 ctx.stroke();
 
-                // 標籤
                 ctx.fillStyle = '#86868B';
                 ctx.font = '10px sans-serif';
-                ctx.fillText('0m', padding, h - 15);
-                ctx.fillText('6.7m(球網)', padding + graphW/2 - 20, h - 15);
-                ctx.fillText('13.4m(底線)', padding + graphW - 50, h - 15);
+                ctx.fillText('0m', padding, h - 5);
+                ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
+                ctx.fillText('13.4m', padding + graphW - 25, h - 5);
             }, [simulationData]);
 
-            // 物理衍生的動能
-            const currentFrame = simulationData.data[progressRef.current] || { speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3 };
+            // === 模擬圖二：動能損耗與裙襬面積微觀形變圖 ===
+            useEffect(() => {
+                const canvas = energyCanvasRef.current;
+                const ctx = canvas.getContext('2d');
+                const traj = simulationData.data;
+
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.scale(dpr, dpr);
+                const w = rect.width;
+                const h = rect.height;
+
+                ctx.clearRect(0,0,w,h);
+                if (traj.length === 0) return;
+
+                const padding = 30;
+                const graphW = w - padding * 2;
+                const graphH = h - padding - 15;
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                ctx.lineWidth = 1;
+                for (let i = 0; i <= 4; i++) {
+                    const y = 15 + (graphH / 4) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(padding, y);
+                    ctx.lineTo(w - padding, y);
+                    ctx.stroke();
+                }
+
+                // 動能曲線 (黃色, 假設極大值約為 80 Joules)
+                ctx.beginPath();
+                traj.forEach((pt, idx) => {
+                    const xCoord = padding + (pt.z / 13.4) * graphW;
+                    const yCoord = 15 + graphH - (pt.kineticEnergy / 80) * graphH;
+                    if (idx === 0) ctx.moveTo(xCoord, yCoord);
+                    else ctx.lineTo(xCoord, yCoord);
+                });
+                ctx.strokeStyle = '#FFD60A';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                // 裙襬面積變化曲線 (青色, 範圍約 0.0015 到 0.0035)
+                ctx.beginPath();
+                traj.forEach((pt, idx) => {
+                    const xCoord = padding + (pt.z / 13.4) * graphW;
+                    // 將面積正規化到 0~1 的畫布高度
+                    const normalizedArea = (pt.area - 0.0015) / (0.0040 - 0.0015);
+                    const yCoord = 15 + graphH - normalizedArea * graphH;
+                    if (idx === 0) ctx.moveTo(xCoord, yCoord);
+                    else ctx.lineTo(xCoord, yCoord);
+                });
+                ctx.strokeStyle = '#64D2FF';
+                ctx.lineWidth = 1.8;
+                ctx.stroke();
+
+                ctx.fillStyle = '#86868B';
+                ctx.font = '10px sans-serif';
+                ctx.fillText('0m', padding, h - 5);
+                ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
+                ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+            }, [simulationData]);
+
+            const currentFrame = simulationData.data[progressRef.current] || { speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15 };
             const elasticEnergy = (0.5 * 0.0052 * Math.pow(v0Kmh / 3.6, 2) * (tension / 30)).toFixed(1);
 
             return (
-                <div className="flex flex-col min-h-screen px-4 md:px-12 py-8 max-w-7xl mx-auto">
+                <div className="flex flex-col min-h-screen px-4 md:px-10 py-6 max-w-[1400px] mx-auto">
                     
-                    {/* === Header (Apple 經典極簡美學) === */}
-                    <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end border-b border-[#222226] pb-6 gap-4">
+                    {/* === Header === */}
+                    <header className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end border-b border-[#222226] pb-4 gap-4">
                         <div>
-                            <div className="text-xs font-semibold tracking-widest text-[#0A84FF] uppercase mb-1.5">Digital Twin Engine</div>
-                            <h1 className="text-4xl font-semibold tracking-tight text-white mb-1">
-                                Badminton <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-[#86868B]">Pro Dynamics</span>
+                            <div className="text-xs font-semibold tracking-widest text-[#0A84FF] uppercase mb-1">Academic Presentation Digital Twin</div>
+                            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-white mb-1">
+                                Badminton <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-[#86868B]">Aero Dynamics</span>
                             </h1>
-                            <p className="text-[#86868B] text-sm font-medium">
-                                基於三維常微分方程 (ODE) 的羽毛球實時氣動特徵數位雙生模擬器
+                            <p className="text-[#86868B] text-xs md:text-sm font-medium">
+                                基於 3D 常微分方程 (ODE) 的羽毛球動態流體力學與氣動彈性形變展示系統
                             </p>
                         </div>
-                        <div className="flex gap-3">
-                            <div className="bg-[#1C1C1E] border border-[#2c2c2e] px-4 py-2 rounded-full flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-[#30D158] animate-pulse"></span>
-                                <span className="text-xs font-medium text-[#86868B]">模擬器就緒</span>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <span className="text-xs font-mono text-[#86868B]">系統版本: v3.0 (Full Dashboard)</span>
                         </div>
                     </header>
 
-                    {/* === 主要工作區 === */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 flex-grow">
+                    {/* === 主工作區 === */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow mb-6">
                         
-                        {/* 左側：控制面板 */}
+                        {/* 左側：簡報與理論大綱 & 物理參數微調 (全部找回來了) */}
                         <div className="lg:col-span-4 flex flex-col gap-6">
                             
-                            {/* 環境與物理配置 */}
-                            <div className="bg-[#1C1C1E] rounded-2xl p-6 border border-[#2c2c2e] shadow-xl">
-                                <h2 className="text-md font-semibold text-white mb-6 flex items-center gap-2">
-                                    <i className="fa-solid fa-sliders text-[#0A84FF]"></i>
-                                    系統物理參數設定
-                                </h2>
+                            {/* Slide 導覽標籤 */}
+                            <div className="flex gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2c2c2e]">
+                                {slides.map((s, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => applySlideSetup(idx)}
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${activeSlide === idx ? 'bg-white text-black font-semibold' : 'text-[#86868B] hover:text-white'}`}
+                                    >
+                                        頁 {idx+1}
+                                    </button>
+                                ))}
+                            </div>
 
-                                {/* 初速 Slider */}
-                                <div className="mb-6">
-                                    <div className="flex justify-between items-baseline mb-2">
-                                        <span className="text-[#86868B] text-xs font-medium">出球初速 ($v_0$)</span>
-                                        <span className="text-white font-mono font-semibold text-lg">{v0Kmh} <span className="text-xs text-[#86868B]">km/h</span></span>
+                            {/* 簡報詳細資訊卡片 */}
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[320px]">
+                                <div className="absolute top-0 right-0 p-6 opacity-5">
+                                    <i className={`fa-solid ${slides[activeSlide].icon} text-7xl`}></i>
+                                </div>
+                                
+                                <div>
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-8 h-8 rounded-full bg-[#0A84FF]/10 flex items-center justify-center">
+                                            <i className={`fa-solid ${slides[activeSlide].icon} text-[#0A84FF]`}></i>
+                                        </div>
+                                        <h2 className="text-md font-semibold text-white">{slides[activeSlide].title}</h2>
                                     </div>
-                                    <input 
-                                        type="range" min="100" max="600" step="5" value={v0Kmh}
-                                        onChange={(e) => setV0Kmh(Number(e.target.value))}
-                                        className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#0A84FF]"
-                                    />
-                                    <div className="flex justify-between mt-1 text-[10px] text-[#55555a] font-mono">
-                                        <span>100 (業餘殺球)</span>
-                                        <span>565 (世界最快紀錄)</span>
+
+                                    <p className="text-xs text-[#86868B] leading-relaxed mb-4">
+                                        {slides[activeSlide].text}
+                                    </p>
+
+                                    <div className="bg-black/60 rounded-xl p-4 mb-4 border border-white/5 flex items-center justify-center">
+                                        <Latex math={slides[activeSlide].formula} block={true} />
                                     </div>
+
+                                    <p className="text-xs text-slate-300 leading-relaxed border-l-2 border-[#BF5AF2] pl-3 py-1">
+                                        <span className="font-semibold text-white">結論：</span>{slides[activeSlide].conclusion}
+                                    </p>
                                 </div>
 
-                                {/* 穿線磅數 Slider */}
-                                <div className="mb-6">
-                                    <div className="flex justify-between items-baseline mb-2">
-                                        <span className="text-[#86868B] text-xs font-medium">拍床張力 (Tension)</span>
-                                        <span className="text-white font-mono font-semibold text-lg">{tension} <span className="text-xs text-[#86868B]">lbs</span></span>
-                                    </div>
-                                    <input 
-                                        type="range" min="20" max="35" step="1" value={tension}
-                                        onChange={(e) => setTension(Number(e.target.value))}
-                                        className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#FF453A]"
-                                    />
-                                </div>
-
-                                {/* 材質選擇 (Apple-style Toggle) */}
-                                <div className="mb-4">
-                                    <span className="text-[#86868B] text-xs font-medium block mb-2">裙襬形變材質</span>
-                                    <div className="flex bg-black rounded-lg p-1 border border-[#2c2c2e]">
-                                        <button 
-                                            onClick={() => setMaterial('natural')}
-                                            className={`flex-1 text-xs py-2 rounded-md transition-all ${material === 'natural' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}
-                                        >
-                                            天然鵝毛裙 (動態收縮)
-                                        </button>
-                                        <button 
-                                            onClick={() => setMaterial('nylon')}
-                                            className={`flex-1 text-xs py-2 rounded-md transition-all ${material === 'nylon' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}
-                                        >
-                                            尼龍塑料裙 (剛性風阻)
-                                        </button>
-                                    </div>
+                                <div className="mt-4 pt-3 border-t border-[#2c2c2e] flex justify-between items-center text-xs text-[#86868B]">
+                                    <span>👉 同步理論與實體沙盒</span>
+                                    <button 
+                                        onClick={() => applySlideSetup(activeSlide)}
+                                        className="bg-[#0A84FF] hover:bg-[#0071e3] text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-lg shadow-[#0A84FF]/20"
+                                    >
+                                        聯動模擬
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* 3D 視角配置 + 3D風向風速控制器 */}
-                            <div className="bg-[#1C1C1E] rounded-2xl p-6 border border-[#2c2c2e] shadow-xl">
-                                <h3 className="text-md font-semibold text-white mb-6 flex items-center gap-2">
-                                    <i className="fa-solid fa-wind text-[#BF5AF2]"></i>
-                                    環境與 3D 相機旋轉
+                            {/* 實時物理沙盒微調器 (已修復：尋回消失的球速與材質選項) */}
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] shadow-xl flex-grow">
+                                <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
+                                    <i className="fa-solid fa-sliders text-[#30D158]"></i>
+                                    實時物理參數沙盒 (Sandbox)
                                 </h3>
-
-                                {/* Yaw Slider */}
-                                <div className="mb-4">
-                                    <div className="flex justify-between text-xs text-[#86868B] mb-2">
-                                        <span>左右偏航角 (Yaw)</span>
-                                        <span className="text-white font-mono">{cameraYaw}°</span>
+                                
+                                <div className="space-y-4">
+                                    {/* 初速 */}
+                                    <div>
+                                        <div className="flex justify-between items-baseline mb-1">
+                                            <span className="text-[#86868B] text-xs font-medium">出球初速 ($v_0$)</span>
+                                            <span className="text-white font-mono font-semibold text-sm">{v0Kmh} <span className="text-[10px] text-[#86868B]">km/h</span></span>
+                                        </div>
+                                        <input 
+                                            type="range" min="100" max="600" step="5" value={v0Kmh}
+                                            onChange={(e) => setV0Kmh(Number(e.target.value))}
+                                            className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#0A84FF]"
+                                        />
                                     </div>
-                                    <input 
-                                        type="range" min="-90" max="90" value={cameraYaw}
-                                        onChange={(e) => setCameraYaw(Number(e.target.value))}
-                                        className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#BF5AF2]"
-                                    />
-                                </div>
 
-                                {/* Pitch Slider */}
-                                <div className="mb-6">
-                                    <div className="flex justify-between text-xs text-[#86868B] mb-2">
-                                        <span>俯仰視角 (Pitch)</span>
-                                        <span className="text-white font-mono">{cameraPitch}°</span>
+                                    {/* 磅數 */}
+                                    <div>
+                                        <div className="flex justify-between items-baseline mb-1">
+                                            <span className="text-[#86868B] text-xs font-medium">拍床張力 (Tension)</span>
+                                            <span className="text-white font-mono font-semibold text-sm">{tension} <span className="text-[10px] text-[#86868B]">lbs</span></span>
+                                        </div>
+                                        <input 
+                                            type="range" min="20" max="35" step="1" value={tension}
+                                            onChange={(e) => setTension(Number(e.target.value))}
+                                            className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#FF453A]"
+                                        />
                                     </div>
-                                    <input 
-                                        type="range" min="5" max="45" value={cameraPitch}
-                                        onChange={(e) => setCameraPitch(Number(e.target.value))}
-                                        className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#BF5AF2]"
-                                    />
-                                </div>
 
-                                {/* 模擬氣流（風速風向） */}
-                                <div className="border-t border-[#2c2c2e] pt-4">
-                                    <div className="flex justify-between text-xs text-[#86868B] mb-2">
-                                        <span>場地干擾風速</span>
-                                        <span className="text-white font-mono">{windSpeed} m/s</span>
+                                    {/* 材質切換 */}
+                                    <div>
+                                        <span className="text-[#86868B] text-xs font-medium block mb-1">裙襬氣動材質</span>
+                                        <div className="flex bg-black rounded-lg p-1 border border-[#2c2c2e]">
+                                            <button 
+                                                onClick={() => setMaterial('natural')}
+                                                className={`flex-1 text-xs py-1.5 rounded-md transition-all ${material === 'natural' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}
+                                            >
+                                                天然鵝毛 (收縮)
+                                            </button>
+                                            <button 
+                                                onClick={() => setMaterial('nylon')}
+                                                className={`flex-1 text-xs py-1.5 rounded-md transition-all ${material === 'nylon' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}
+                                            >
+                                                尼龍塑膠 (剛性)
+                                            </button>
+                                        </div>
                                     </div>
-                                    <input 
-                                        type="range" min="0" max="15" value={windSpeed}
-                                        onChange={(e) => setWindSpeed(Number(e.target.value))}
-                                        className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#0A84FF]"
-                                    />
+
+                                    {/* 風向風速 Grid */}
+                                    <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#2c2c2e]">
+                                        <div>
+                                            <label className="text-[10px] text-[#86868B] block mb-1">場地風速: {windSpeed} m/s</label>
+                                            <input 
+                                                type="range" min="0" max="15" value={windSpeed}
+                                                onChange={(e) => setWindSpeed(Number(e.target.value))}
+                                                className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#30D158]"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-[#86868B] block mb-1">風向角度: {windDir}°</label>
+                                            <input 
+                                                type="range" min="0" max="360" value={windDir}
+                                                onChange={(e) => setWindDir(Number(e.target.value))}
+                                                className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#30D158]"
+                                            />
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
+
                         </div>
 
-                        {/* 右側：3D 主渲染區 */}
-                        <div className="lg:col-span-8 flex flex-col gap-6">
+                        {/* 右側：3D 數位雙生實體 Canvas 主視窗 */}
+                        <div className="lg:col-span-8 flex flex-col">
                             
-                            <div className="bg-[#1C1C1E] rounded-3xl border border-[#2c2c2e] shadow-2xl relative overflow-hidden flex flex-col flex-grow min-h-[480px]">
+                            <div className="bg-[#1C1C1E] rounded-3xl border border-[#2c2c2e] shadow-2xl relative overflow-hidden flex flex-col flex-grow min-h-[450px]">
                                 
-                                {/* 浮動頂部面板 */}
-                                <div className="absolute top-6 left-6 z-10 flex gap-2">
-                                    <span className="bg-black/55 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs text-[#86868B] flex items-center gap-2">
-                                        <i className="fa-solid fa-cube text-[#0A84FF]"></i> WebGL-Canvas 3D Viewport
-                                    </span>
-                                    <span className="bg-black/55 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs font-mono text-[#30D158]">
-                                        積分步長 dt: 0.0015s
-                                    </span>
+                                <div className="absolute top-5 left-5 right-5 z-10 flex justify-between items-start">
+                                    <div className="flex gap-2 pointer-events-none">
+                                        <span className="bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs text-[#86868B] flex items-center gap-2">
+                                            <i className="fa-solid fa-cube text-[#0A84FF]"></i> 3D 空間投影 (拖曳旋轉)
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={handleResetView}
+                                            className="bg-black/60 hover:bg-[#32D74B]/20 backdrop-blur-md border border-white/10 hover:border-[#32D74B]/40 px-3 py-1.5 rounded-full text-xs text-white flex items-center gap-1.5 transition-all active:scale-95 duration-200"
+                                        >
+                                            <i className="fa-solid fa-rotate-left text-[#32D74B]"></i> 重置視角
+                                        </button>
+                                        <span className="hidden sm:inline bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs font-mono text-[#30D158] pointer-events-none">
+                                            Yaw: {Math.round(cameraYaw)}° | Pitch: {Math.round(cameraPitch)}°
+                                        </span>
+                                    </div>
                                 </div>
 
-                                {/* 3D Canvas */}
+                                {/* 3D Canvas 主體 */}
                                 <canvas 
                                     ref={mainCanvasRef} 
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUpOrLeave}
+                                    onMouseLeave={handleMouseUpOrLeave}
                                     className="w-full h-full min-h-[400px] flex-grow cursor-grab active:cursor-grabbing"
                                 />
 
-                                {/* 底部浮動：實時流場遙測計 */}
-                                <div className="absolute bottom-6 left-6 right-6 z-10 grid grid-cols-3 gap-4">
-                                    <div className="bg-black/45 backdrop-blur-lg border border-white/10 rounded-2xl p-4">
-                                        <div className="text-[#86868B] text-xs mb-1">瞬時速度 (Velocity)</div>
-                                        <div className="text-2xl md:text-3xl font-mono text-white tracking-tight">
-                                            {currentFrame.speed.toFixed(0)} <span className="text-sm font-sans text-[#86868B]">km/h</span>
+                                {/* 懸浮多維遙測計 */}
+                                <div className="absolute bottom-5 left-5 right-5 z-10 grid grid-cols-3 gap-4 pointer-events-none">
+                                    <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
+                                        <div className="text-[#86868B] text-[10px] mb-1 uppercase tracking-wider">瞬時時速</div>
+                                        <div className="text-2xl font-mono text-white tracking-tight">
+                                            {currentFrame.speed.toFixed(0)} <span className="text-[10px] font-sans text-[#86868B]">km/h</span>
                                         </div>
                                     </div>
-                                    <div className="bg-black/45 backdrop-blur-lg border border-white/10 rounded-2xl p-4">
-                                        <div className="text-[#86868B] text-xs mb-1">迎風截面積 (Area)</div>
-                                        <div className="text-2xl md:text-3xl font-mono text-white tracking-tight">
-                                            {(currentFrame.area * 10000).toFixed(1)} <span className="text-sm font-sans text-[#86868B]">cm²</span>
+                                    <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
+                                        <div className="text-[#86868B] text-[10px] mb-1 uppercase tracking-wider">迎風截面</div>
+                                        <div className="text-2xl font-mono text-white tracking-tight">
+                                            {(currentFrame.area * 10000).toFixed(1)} <span className="text-[10px] font-sans text-[#86868B]">cm²</span>
                                         </div>
                                     </div>
-                                    <div className="bg-black/45 backdrop-blur-lg border border-white/10 rounded-2xl p-4">
-                                        <div className="text-[#86868B] text-xs mb-1">實時風阻 (Drag Force)</div>
-                                        <div className="text-2xl md:text-3xl font-mono text-[#FF453A] tracking-tight">
-                                            {currentFrame.drag.toFixed(1)} <span className="text-sm font-sans text-[#86868B]">N</span>
+                                    <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
+                                        <div className="text-[#86868B] text-[10px] mb-1 uppercase tracking-wider">流體阻力</div>
+                                        <div className="text-2xl font-mono text-[#FF453A] tracking-tight">
+                                            {currentFrame.drag.toFixed(1)} <span className="text-[10px] font-sans text-[#86868B]">N</span>
                                         </div>
                                     </div>
-                                </div>
-                            </div>
-
-                            {/* 底部數據與圖表自繪面板 */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                
-                                {/* 左：常規物理遙測數據 */}
-                                <div className="bg-[#1C1C1E] rounded-2xl p-6 border border-[#2c2c2e] flex flex-col justify-between">
-                                    <div>
-                                        <h3 className="text-sm font-semibold text-white mb-4">流體力學動態反饋</h3>
-                                        <div className="space-y-3.5">
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-[#86868B]">拍面最高儲存彈力位能</span>
-                                                <span className="font-mono text-white text-md font-semibold">{elasticEnergy} J</span>
-                                            </div>
-                                            <div className="h-[1px] bg-[#222226]"></div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-[#86868B]">最大空氣阻力峰值</span>
-                                                <span className="font-mono text-[#FF453A] text-md font-semibold">{simulationData.maxDrag.toFixed(1)} N</span>
-                                            </div>
-                                            <div className="h-[1px] bg-[#222226]"></div>
-                                            <div className="flex justify-between items-center text-sm">
-                                                <span className="text-[#86868B]">過網耗時 (0m - 6.7m)</span>
-                                                <span className="font-mono text-[#30D158] text-md font-semibold">
-                                                    {(simulationData.data.find(d => d.z >= 6.7)?.time || 0).toFixed(3)} 秒
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* 播放控制按鈕 */}
-                                    <div className="flex justify-center gap-4 mt-6">
-                                        <button 
-                                            onClick={() => setIsPlaying(!isPlaying)}
-                                            className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-200 transition-colors"
-                                        >
-                                            {isPlaying ? <i className="fa-solid fa-pause"></i> : <i className="fa-solid fa-play ml-0.5"></i>}
-                                        </button>
-                                        <button 
-                                            onClick={() => { progressRef.current = 0; setIsPlaying(true); }}
-                                            className="w-10 h-10 rounded-full bg-[#2c2c2e] text-white flex items-center justify-center hover:bg-[#3e3e42] transition-colors"
-                                        >
-                                            <i className="fa-solid fa-arrow-rotate-left"></i>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* 右：自繪氣動阻力牆衰減曲線 */}
-                                <div className="bg-[#1C1C1E] rounded-2xl p-6 border border-[#2c2c2e] flex flex-col">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <h3 className="text-sm font-semibold text-white">氣動阻力牆與速度衰減</h3>
-                                        <div className="flex gap-3 text-[10px]">
-                                            <span className="text-[#BF5AF2] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#BF5AF2]"></span>速度</span>
-                                            <span className="text-[#FF453A] flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#FF453A]"></span>阻力</span>
-                                        </div>
-                                    </div>
-                                    <canvas 
-                                        ref={chartCanvasRef} 
-                                        className="w-full h-full min-h-[140px] flex-grow"
-                                    />
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* === 底部：多重數據儀表板 (新增了第三張動能損耗圖) === */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        
+                        {/* 綜合遙測性能統計 */}
+                        <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-lg">
+                            <div>
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-4">流體力學數據綜合解析</h3>
+                                <div className="space-y-3 text-sm">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[#86868B]">初始彈性動能 (Impact)</span>
+                                        <span className="font-mono text-white font-semibold">{elasticEnergy} J</span>
+                                    </div>
+                                    <div className="h-[1px] bg-[#222226]"></div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[#86868B]">空氣阻力極限峰值</span>
+                                        <span className="font-mono text-[#FF453A] font-semibold">{simulationData.maxDrag.toFixed(1)} N</span>
+                                    </div>
+                                    <div className="h-[1px] bg-[#222226]"></div>
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[#86868B]">穿越球網耗時 (0-6.7m)</span>
+                                        <span className="font-mono text-[#30D158] font-semibold">
+                                            {(simulationData.data.find(d => d.z >= 6.7)?.time || 0).toFixed(4)} s
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-center gap-3 mt-4">
+                                <button 
+                                    onClick={() => setIsPlaying(!isPlaying)}
+                                    className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-slate-200 transition-colors shadow-lg"
+                                >
+                                    {isPlaying ? <i className="fa-solid fa-pause"></i> : <i className="fa-solid fa-play ml-0.5"></i>}
+                                </button>
+                                <button 
+                                    onClick={() => { progressRef.current = 0; setIsPlaying(true); }}
+                                    className="w-10 h-10 rounded-full bg-[#2c2c2e] text-white flex items-center justify-center hover:bg-[#3a3a3c] transition-colors"
+                                >
+                                    <i className="fa-solid fa-arrow-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* 模擬圖一：氣動衰減圖 */}
+                        <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                            <div className="flex justify-between items-center mb-2">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">氣動衰減動態特徵</h3>
+                                <div className="flex gap-3 text-[10px]">
+                                    <span className="text-[#BF5AF2] flex items-center gap-1">速度(km/h)</span>
+                                    <span className="text-[#FF453A] flex items-center gap-1">阻力(N)</span>
+                                </div>
+                            </div>
+                            <canvas ref={chartCanvasRef} className="w-full h-full min-h-[130px] flex-grow" />
+                        </div>
+
+                        {/* 模擬圖二：動能損耗與裙襬面積變形圖 (全新新增！) */}
+                        <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                            <div className="flex justify-between items-center mb-2">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">動能損耗與微觀形變</h3>
+                                <div className="flex gap-3 text-[10px]">
+                                    <span className="text-[#FFD60A] flex items-center gap-1">動能(J)</span>
+                                    <span className="text-[#64D2FF] flex items-center gap-1">裙面積(m²)</span>
+                                </div>
+                            </div>
+                            <canvas ref={energyCanvasRef} className="w-full h-full min-h-[130px] flex-grow" />
+                        </div>
+
                     </div>
                 </div>
             );
