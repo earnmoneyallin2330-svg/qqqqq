@@ -786,25 +786,34 @@
                     ctx.beginPath(); ctx.arc(cPos.px,cPos.py, 5*cPos.perspective, 0, Math.PI*2); ctx.fill();
                     ctx.shadowBlur = 0;
                 };
-                const render = () => {
+                let lastTime = performance.now();
+                const render = (timestamp) => {
+                    const now = timestamp || performance.now();
+                    // 限制最大 deltaTime = 0.1 秒，避免切換分頁回來時球瞬間飛走
+                    const deltaTime = Math.min((now - lastTime) / 1000, 0.1);
+                    lastTime = now;
                     if (width===0||height===0) { animationRef.current=requestAnimationFrame(render); return; }
                     ctx.fillStyle = '#070708'; ctx.fillRect(0,0,width,height);
                     drawCourt();
                     if (windSpeed > 0) drawWindParticles();
+                    
                     if (isPlaying && traj.length > 0) {
-                        progressRef.current += 1;
+                        // 以 60fps 為基準的等速播放，不管 60Hz 還是 144Hz 螢幕，1 秒都前進 60 幀的資料量
+                        progressRef.current += 60 * deltaTime;
                         if (progressRef.current >= traj.length) progressRef.current = 0;
                     }
-                    drawTrajectory(progressRef.current);
+                    
+                    const currentIdx = Math.floor(progressRef.current);
+                    drawTrajectory(currentIdx);
                     frameCounterRef.current += 1;
                     if (frameCounterRef.current % 6 === 0) {
-                        const safeIdx = Math.max(0, Math.min(progressRef.current, traj.length - 1));
+                        const safeIdx = Math.max(0, Math.min(currentIdx, traj.length - 1));
                         const frame = traj[safeIdx];
                         if (frame) setDisplayFrame(frame);
                     }
                     animationRef.current = requestAnimationFrame(render);
                 };
-                render();
+                animationRef.current = requestAnimationFrame(render);
                 return () => { cancelAnimationFrame(animationRef.current); resizeObserver.disconnect(); };
             }, [simulationData, isPlaying, windSpeed, windDir]);
             /* ★ cameraYaw/cameraPitch 已從依賴移除，動畫迴圈透過 ref 即時讀取 */
