@@ -17,17 +17,13 @@
             }
         }
     </script>
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js"></script>
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <style>
         /* Apple Range Slider styling */
         input[type="range"]::-webkit-slider-thumb {
@@ -58,15 +54,106 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #3a3a3c;
         }
+        /* [Bug #8 Fix] CDN 載入失敗時的 fallback 樣式 */
+        #cdn-error {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            color: #FF453A;
+            font-family: -apple-system, sans-serif;
+            z-index: 99999;
+            padding: 40px;
+        }
+        #cdn-error h1 { font-size: 24px; margin-bottom: 16px; }
+        #cdn-error p { color: #86868B; font-size: 14px; line-height: 1.6; }
+        #cdn-error code { background: #1C1C1E; padding: 2px 6px; border-radius: 4px; color: #FF9F0A; }
     </style>
 </head>
 <body class="bg-black text-[#F5F5F7] min-h-screen overflow-x-hidden antialiased">
-
+    <!-- [Bug #8 Fix] CDN 載入失敗時的 fallback 訊息 -->
+    <div id="cdn-error">
+        <h1>⚠️ 系統載入失敗</h1>
+        <p>部分必要的 CDN 資源載入失敗，請檢查網路連線後重新整理頁面。</p>
+        <p style="margin-top:12px;">失敗的資源：<span id="cdn-error-detail"></span></p>
+        <p style="margin-top:20px;">按 <code>Ctrl+Shift+R</code> (Windows) 或 <code>Cmd+Shift+R</code> (Mac) 強制重新載入。</p>
+    </div>
     <div id="root"></div>
-
+    <!-- [Bug #8 Fix] CDN 載入檢測 -->
+    <script>
+        (function checkCDN() {
+            var missing = [];
+            if (typeof React === 'undefined') missing.push('React');
+            if (typeof ReactDOM === 'undefined') missing.push('ReactDOM');
+            if (typeof Babel === 'undefined') missing.push('Babel');
+            if (typeof katex === 'undefined') missing.push('KaTeX');
+            if (missing.length > 0) {
+                var el = document.getElementById('cdn-error');
+                var detail = document.getElementById('cdn-error-detail');
+                if (el) el.style.display = 'block';
+                if (detail) detail.textContent = missing.join(', ');
+            }
+        })();
+    </script>
     <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
-
+        const { useState, useEffect, useRef, useMemo, useCallback } = React;
+        /* ============================================================
+         * [Bug #1 Fix] React Error Boundary
+         * React 18 Production 模式下，render 階段的任何未攔截 error
+         * 都會靜默卸載整個 component tree，造成空白頁面。
+         * 加入 ErrorBoundary 後會 catch error 並顯示 fallback UI。
+         * ============================================================ */
+        class ErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { hasError: false, error: null };
+            }
+            static getDerivedStateFromError(error) {
+                return { hasError: true, error };
+            }
+            componentDidCatch(error, errorInfo) {
+                console.error('[Badminton Digital Twin] 渲染錯誤:', error, errorInfo);
+            }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div style={{
+                            position: 'fixed', inset: 0, background: '#000',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontFamily: '-apple-system, sans-serif', padding: '40px'
+                        }}>
+                            <div style={{ maxWidth: '500px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
+                                <h1 style={{ color: '#FF453A', fontSize: '22px', fontWeight: 600, marginBottom: '12px' }}>
+                                    系統渲染錯誤
+                                </h1>
+                                <p style={{ color: '#86868B', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+                                    模擬引擎遇到未預期的錯誤。請嘗試重新整理頁面。
+                                </p>
+                                <pre style={{
+                                    background: '#1C1C1E', color: '#FF9F0A', padding: '16px',
+                                    borderRadius: '12px', fontSize: '12px', textAlign: 'left',
+                                    overflowX: 'auto', marginBottom: '20px', border: '1px solid #2c2c2e'
+                                }}>
+                                    {this.state.error && this.state.error.toString()}
+                                </pre>
+                                <button
+                                    onClick={() => window.location.reload()}
+                                    style={{
+                                        background: '#0A84FF', color: '#fff', border: 'none',
+                                        padding: '10px 24px', borderRadius: '10px', fontSize: '14px',
+                                        fontWeight: 600, cursor: 'pointer'
+                                    }}
+                                >
+                                    重新整理頁面
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
         function Latex({ math, block = false }) {
             const containerRef = useRef(null);
             useEffect(() => {
@@ -83,7 +170,6 @@
             }, [math, block]);
             return <span ref={containerRef} />;
         }
-
         function App() {
             const [v0Kmh, setV0Kmh] = useState(565);
             const [tension, setTension] = useState(32);
@@ -97,19 +183,23 @@
             
             const [windSpeed, setWindSpeed] = useState(0); 
             const [windDir, setWindDir] = useState(180); 
-
             const [activeSlide, setActiveSlide] = useState(0);
-
+            /* [Bug #4 Fix] 新增 displayFrame state，用於即時更新 HUD */
+            const [displayFrame, setDisplayFrame] = useState({
+                speed: 565, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15
+            });
             const mainCanvasRef = useRef(null);
             const chartCanvasRef = useRef(null);
             const energyCanvasRef = useRef(null);
             const animationRef = useRef(null);
             const progressRef = useRef(0);
+            const frameCounterRef = useRef(0);
             
             const isDraggingRef = useRef(false);
             const previousMousePosition = useRef({ x: 0, y: 0 });
-
-            const windParticles = useMemo(() => {
+            /* [Bug #7 Fix] 用 useRef 取代 useMemo 來存放 mutable 的 windParticles */
+            const windParticlesRef = useRef(null);
+            if (windParticlesRef.current === null) {
                 const arr = [];
                 for(let i=0; i<30; i++) {
                     arr.push({
@@ -119,9 +209,8 @@
                         speedFactor: 0.2 + Math.random() * 0.8
                     });
                 }
-                return arr;
-            }, []);
-
+                windParticlesRef.current = arr;
+            }
             const slides = [
                 {
                     title: "1. 極速彈射與動能特徵",
@@ -164,7 +253,6 @@
                     setup: { v0: 565, tension: 32, material: 'natural' }
                 }
             ];
-
             const applySlideSetup = (slideIndex) => {
                 const conf = slides[slideIndex].setup;
                 setV0Kmh(conf.v0);
@@ -173,12 +261,10 @@
                 setActiveSlide(slideIndex);
                 progressRef.current = 0; 
             };
-
             const handleResetView = () => {
                 setCameraYaw(defaultYaw);
                 setCameraPitch(defaultPitch);
             };
-
             const simulationData = useMemo(() => {
                 const m = 0.0052; 
                 const rho = 1.225; 
@@ -187,7 +273,6 @@
                 const Amin = 0.0017; 
                 const g = 9.81; 
                 const dt = 0.0015; 
-
                 let t = 0;
                 let v_mag = v0Kmh / 3.6; 
                 let angle = -1 * (4 + (v0Kmh / 600) * 12) * (Math.PI / 180); 
@@ -197,45 +282,42 @@
                 let z = 0;
                 let y = 3.15; 
                 let x = 0; 
-
                 const windRad = (windDir * Math.PI) / 180;
                 const wx = windSpeed * Math.sin(windRad);
                 const wz = windSpeed * Math.cos(windRad);
-
                 const data = [];
                 let maxDrag = 0;
-
-                while (y >= 0 && z <= 15) {
+                /* [Bug #3 Fix] 加入最大迭代次數保護，防止極端參數凍結瀏覽器 */
+                let iterations = 0;
+                const MAX_ITERATIONS = 50000;
+                while (y >= 0 && z <= 15 && iterations < MAX_ITERATIONS) {
+                    iterations++;
                     const vrx = vx - wx;
                     const vry = vy;
                     const vrz = vz - wz;
                     const vr_mag = Math.sqrt(vrx * vrx + vry * vry + vrz * vrz);
-
                     let A = A0;
                     if (material === 'natural') {
                         A = Amin + (A0 - Amin) * Math.exp(-0.00035 * vr_mag * vr_mag);
                     } else {
                         A = A0 * 0.88 + (A0 * 0.12) * Math.exp(-0.00012 * vr_mag * vr_mag);
                     }
-
                     const Fd = 0.5 * rho * vr_mag * vr_mag * Cd_base * A;
                     if (Fd > maxDrag) maxDrag = Fd;
-
                     const ax = vr_mag === 0 ? 0 : -(Fd / m) * (vrx / vr_mag);
                     const ay = vr_mag === 0 ? -g : -g - (Fd / m) * (vry / vr_mag);
                     const az = vr_mag === 0 ? 0 : -(Fd / m) * (vrz / vr_mag);
-
                     vx += ax * dt;
                     vy += ay * dt;
                     vz += az * dt;
                     x += vx * dt;
                     y += vy * dt;
                     z += vz * dt;
-
+                    /* 防止 NaN 傳播：一旦出現 NaN 立即中斷 */
+                    if (isNaN(x) || isNaN(y) || isNaN(z)) break;
                     v_mag = Math.sqrt(vx * vx + vy * vy + vz * vz);
                     const kineticEnergy = 0.5 * m * v_mag * v_mag;
                     t += dt;
-
                     if (Math.floor(t * 10000) % 30 === 0) {
                         data.push({
                             time: t,
@@ -249,17 +331,27 @@
                 }
                 return { data, maxDrag };
             }, [v0Kmh, material, windSpeed, windDir]);
-
+            /* [Bug #2 Fix] 當 simulationData 變化時，立即重置 progressRef
+             * 防止舊的 progressRef.current 值超出新的 data 陣列長度 */
+            useEffect(() => {
+                progressRef.current = 0;
+                frameCounterRef.current = 0;
+                /* 同步更新 displayFrame 為初始值 */
+                if (simulationData.data.length > 0) {
+                    setDisplayFrame(simulationData.data[0]);
+                } else {
+                    setDisplayFrame({ speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15 });
+                }
+            }, [simulationData]);
+            /* --- 相機拖曳事件 --- */
             const handleMouseDown = (e) => {
                 isDraggingRef.current = true;
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
             };
-
             const handleMouseMove = (e) => {
                 if (!isDraggingRef.current) return;
                 const deltaX = e.clientX - previousMousePosition.current.x;
                 const deltaY = e.clientY - previousMousePosition.current.y;
-
                 setCameraYaw(prev => {
                     const next = prev - deltaX * 0.5;
                     return next > 90 ? 90 : next < -90 ? -90 : next;
@@ -268,27 +360,58 @@
                     const next = prev - deltaY * 0.3;
                     return next > 45 ? 45 : next < 5 ? 5 : next;
                 });
-
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
             };
-
             const handleMouseUpOrLeave = () => { isDraggingRef.current = false; };
-
+            /* [Bug #6 Fix] 觸控事件支援 */
+            const handleTouchStart = (e) => {
+                if (e.touches.length === 1) {
+                    isDraggingRef.current = true;
+                    previousMousePosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                }
+            };
+            const handleTouchMove = (e) => {
+                if (!isDraggingRef.current || e.touches.length !== 1) return;
+                e.preventDefault();
+                const deltaX = e.touches[0].clientX - previousMousePosition.current.x;
+                const deltaY = e.touches[0].clientY - previousMousePosition.current.y;
+                setCameraYaw(prev => {
+                    const next = prev - deltaX * 0.5;
+                    return next > 90 ? 90 : next < -90 ? -90 : next;
+                });
+                setCameraPitch(prev => {
+                    const next = prev - deltaY * 0.3;
+                    return next > 45 ? 45 : next < 5 ? 5 : next;
+                });
+                previousMousePosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            };
+            const handleTouchEnd = () => { isDraggingRef.current = false; };
+            /* ============================================================
+             * 主要 3D 場景 Canvas 渲染
+             * ============================================================ */
             useEffect(() => {
                 const canvas = mainCanvasRef.current;
-                if (!canvas) return; // 防禦性編程：阻斷 Null 參照崩潰
+                if (!canvas) return;
                 
                 const ctx = canvas.getContext('2d');
+                if (!ctx) return; /* 防禦性：getContext 可能回傳 null */
                 const traj = simulationData.data;
-                
+                /* [Bug #5 Fix] 使用 ResizeObserver 處理 canvas 尺寸變化 */
+                let width = 0;
+                let height = 0;
                 const dpr = window.devicePixelRatio || 1;
-                const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                ctx.scale(dpr, dpr);
-                const width = rect.width;
-                const height = rect.height;
-
+                const resizeCanvas = () => {
+                    const rect = canvas.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) return;
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    width = rect.width;
+                    height = rect.height;
+                };
+                resizeCanvas();
+                const resizeObserver = new ResizeObserver(() => { resizeCanvas(); });
+                resizeObserver.observe(canvas);
                 const project = (x, y, z) => {
                     const scale = width * 0.054; 
                     const offsetX = width * 0.5;
@@ -296,47 +419,39 @@
                     
                     const radYaw = (cameraYaw * Math.PI) / 180;
                     const radPitch = (cameraPitch * Math.PI) / 180;
-
                     const cx = x;
                     const cy = y;
                     const cz = z - 6.7; 
-
                     let rotX = cx * Math.cos(radYaw) - cz * Math.sin(radYaw);
                     let rotZ = cx * Math.sin(radYaw) + cz * Math.cos(radYaw);
                     
                     const finalY = cy * Math.cos(radPitch) + rotZ * Math.sin(radPitch);
                     const finalZ = -cy * Math.sin(radPitch) + rotZ * Math.cos(radPitch);
-
                     const distance = 16; 
                     const perspective = distance / (distance + finalZ);
                     const px = offsetX + rotX * scale * perspective;
                     const py = offsetY - finalY * scale * perspective;
-
                     return { px, py, perspective };
                 };
-
+                const windParticles = windParticlesRef.current;
                 const drawWindParticles = () => {
                     ctx.fillStyle = 'rgba(10, 132, 255, 0.15)';
                     const windRad = (windDir * Math.PI) / 180;
                     const wx = windSpeed * Math.sin(windRad) * 0.05;
                     const wz = windSpeed * Math.cos(windRad) * 0.05;
-
                     windParticles.forEach(p => {
                         p.x += wx * p.speedFactor;
                         p.z += wz * p.speedFactor;
-
                         if (p.z > 13.4) p.z = 0;
                         if (p.z < 0) p.z = 13.4;
                         if (p.x > 4) p.x = -4;
                         if (p.x < -4) p.x = 4;
-
                         const pos = project(p.x, p.y, p.z);
                         ctx.beginPath();
                         ctx.arc(pos.px, pos.py, 1.5 * pos.perspective, 0, Math.PI * 2);
                         ctx.fill();
                     });
                 };
-
                 const drawCourt = () => {
                     ctx.shadowBlur = 0;
                     ctx.lineWidth = 1;
@@ -352,7 +467,6 @@
                     ctx.lineTo(c3.px, c3.py); ctx.lineTo(c4.px, c4.py);
                     ctx.closePath();
                     ctx.fill();
-
                     ctx.strokeStyle = 'rgba(255,255,255,0.25)';
                     ctx.lineWidth = 1.5;
                     ctx.beginPath();
@@ -360,7 +474,6 @@
                     ctx.lineTo(c3.px, c3.py); ctx.lineTo(c4.px, c4.py);
                     ctx.closePath();
                     ctx.stroke();
-
                     const lines = [
                         [{x: -2.59, z: 0}, {x: -2.59, z: 13.4}],
                         [{x: 2.59, z: 0}, {x: 2.59, z: 13.4}],
@@ -371,7 +484,6 @@
                         [{x: 0, z: 0}, {x: 0, z: 1.98}],
                         [{x: 0, z: 11.42}, {x: 0, z: 13.4}]
                     ];
-
                     ctx.lineWidth = 1;
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
                     lines.forEach(pts => {
@@ -383,7 +495,6 @@
                         });
                         ctx.stroke();
                     });
-
                     ctx.fillStyle = 'rgba(10, 132, 255, 0.08)';
                     ctx.strokeStyle = 'rgba(10, 132, 255, 0.25)';
                     ctx.beginPath();
@@ -396,7 +507,6 @@
                     ctx.closePath();
                     ctx.fill();
                     ctx.stroke();
-
                     ctx.strokeStyle = 'rgba(10, 132, 255, 0.04)';
                     for(let i=1; i<10; i++) {
                         const ratio = i / 10;
@@ -406,7 +516,6 @@
                         ctx.moveTo(hStart.px, hStart.py); ctx.lineTo(hEnd.px, hEnd.py);
                         ctx.stroke();
                     }
-
                     ctx.lineWidth = 3;
                     ctx.strokeStyle = '#0A84FF';
                     ctx.beginPath();
@@ -414,14 +523,14 @@
                     ctx.moveTo(n2.px, n2.py); ctx.lineTo(n3.px, n3.py);
                     ctx.stroke();
                 };
-
                 const drawTrajectory = (idx) => {
                     if (traj.length === 0) return;
-                    const maxIdx = Math.min(idx, traj.length - 1);
-
+                    /* [Bug #2 Fix 加強] 雙重夾限，確保 index 不越界 */
+                    const maxIdx = Math.max(0, Math.min(idx, traj.length - 1));
                     ctx.beginPath();
                     for (let i = 0; i <= maxIdx; i++) {
                         const pt = traj[i];
+                        if (!pt) continue; /* 防禦性跳過 */
                         const { px, py } = project(pt.x, pt.y, pt.z);
                         if (i === 0) ctx.moveTo(px, py);
                         else ctx.lineTo(px, py);
@@ -432,11 +541,10 @@
                     ctx.shadowColor = '#30D158';
                     ctx.stroke();
                     ctx.shadowBlur = 0; 
-
                     const current = traj[maxIdx];
+                    if (!current) return; /* 防禦性中斷 */
                     const cPos = project(current.x, current.y, current.z);
                     const sPos = project(current.x, 0, current.z);
-
                     ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
                     ctx.setLineDash([4, 4]);
                     ctx.beginPath();
@@ -444,12 +552,10 @@
                     ctx.lineTo(sPos.px, sPos.py);
                     ctx.stroke();
                     ctx.setLineDash([]); 
-
                     ctx.fillStyle = 'rgba(0,0,0,0.6)';
                     ctx.beginPath();
                     ctx.arc(sPos.px, sPos.py, 6 * cPos.perspective, 0, Math.PI * 2);
                     ctx.fill();
-
                     ctx.fillStyle = '#FFFFFF';
                     ctx.shadowBlur = 15;
                     ctx.shadowColor = '#FFFFFF';
@@ -458,153 +564,172 @@
                     ctx.fill();
                     ctx.shadowBlur = 0;
                 };
-
                 const render = () => {
+                    if (width === 0 || height === 0) {
+                        animationRef.current = requestAnimationFrame(render);
+                        return;
+                    }
                     ctx.fillStyle = '#070708';
                     ctx.fillRect(0, 0, width, height);
-
                     drawCourt();
                     if (windSpeed > 0) drawWindParticles();
-
                     if (isPlaying && traj.length > 0) {
                         progressRef.current += 1;
                         if (progressRef.current >= traj.length) progressRef.current = 0;
                     }
-
                     drawTrajectory(progressRef.current);
+                    /* [Bug #4 Fix] 每 6 幀更新一次 HUD state（約 10fps），
+                     * 避免每幀都 setState 造成效能問題 */
+                    frameCounterRef.current += 1;
+                    if (frameCounterRef.current % 6 === 0) {
+                        const safeIdx = Math.max(0, Math.min(progressRef.current, traj.length - 1));
+                        const frame = traj[safeIdx];
+                        if (frame) {
+                            setDisplayFrame(frame);
+                        }
+                    }
                     animationRef.current = requestAnimationFrame(render);
                 };
-
                 render();
-                return () => cancelAnimationFrame(animationRef.current);
+                return () => {
+                    cancelAnimationFrame(animationRef.current);
+                    resizeObserver.disconnect();
+                };
             }, [simulationData, isPlaying, cameraYaw, cameraPitch, windSpeed, windDir]);
-
+            /* ============================================================
+             * 速度/阻力 圖表 Canvas
+             * ============================================================ */
             useEffect(() => {
                 const canvas = chartCanvasRef.current;
-                if (!canvas) return; // 防禦性編程：阻斷 Null 參照崩潰
+                if (!canvas) return;
                 
                 const ctx = canvas.getContext('2d');
+                if (!ctx) return;
                 const traj = simulationData.data;
-
-                const dpr = window.devicePixelRatio || 1;
-                const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                ctx.scale(dpr, dpr);
-                const w = rect.width;
-                const h = rect.height;
-
-                ctx.clearRect(0,0,w,h);
-                if (traj.length === 0) return;
-
-                const padding = 30;
-                const graphW = w - padding * 2;
-                const graphH = h - padding - 15;
-
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.lineWidth = 1;
-                for (let i = 0; i <= 4; i++) {
-                    const y = 15 + (graphH / 4) * i;
+                const drawChart = () => {
+                    const dpr = window.devicePixelRatio || 1;
+                    const rect = canvas.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) return;
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    const w = rect.width;
+                    const h = rect.height;
+                    ctx.clearRect(0,0,w,h);
+                    if (traj.length === 0) return;
+                    const padding = 30;
+                    const graphW = w - padding * 2;
+                    const graphH = h - padding - 15;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i <= 4; i++) {
+                        const y = 15 + (graphH / 4) * i;
+                        ctx.beginPath();
+                        ctx.moveTo(padding, y);
+                        ctx.lineTo(w - padding, y);
+                        ctx.stroke();
+                    }
                     ctx.beginPath();
-                    ctx.moveTo(padding, y);
-                    ctx.lineTo(w - padding, y);
+                    traj.forEach((pt, idx) => {
+                        const xCoord = padding + (pt.z / 13.4) * graphW;
+                        const yCoord = 15 + graphH - (pt.speed / 600) * graphH;
+                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
+                        else ctx.lineTo(xCoord, yCoord);
+                    });
+                    ctx.strokeStyle = '#BF5AF2';
+                    ctx.lineWidth = 2.5;
                     ctx.stroke();
-                }
-
-                ctx.beginPath();
-                traj.forEach((pt, idx) => {
-                    const xCoord = padding + (pt.z / 13.4) * graphW;
-                    const yCoord = 15 + graphH - (pt.speed / 600) * graphH;
-                    if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                    else ctx.lineTo(xCoord, yCoord);
-                });
-                ctx.strokeStyle = '#BF5AF2';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-
-                ctx.beginPath();
-                traj.forEach((pt, idx) => {
-                    const xCoord = padding + (pt.z / 13.4) * graphW;
-                    const yCoord = 15 + graphH - (pt.drag / 40) * graphH;
-                    if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                    else ctx.lineTo(xCoord, yCoord);
-                });
-                ctx.strokeStyle = '#FF453A';
-                ctx.lineWidth = 1.8;
-                ctx.stroke();
-
-                ctx.fillStyle = '#86868B';
-                ctx.font = '10px sans-serif';
-                ctx.fillText('0m', padding, h - 5);
-                ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
-                ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+                    ctx.beginPath();
+                    traj.forEach((pt, idx) => {
+                        const xCoord = padding + (pt.z / 13.4) * graphW;
+                        const yCoord = 15 + graphH - (pt.drag / 40) * graphH;
+                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
+                        else ctx.lineTo(xCoord, yCoord);
+                    });
+                    ctx.strokeStyle = '#FF453A';
+                    ctx.lineWidth = 1.8;
+                    ctx.stroke();
+                    ctx.fillStyle = '#86868B';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText('0m', padding, h - 5);
+                    ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
+                    ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+                };
+                drawChart();
+                /* [Bug #5 Fix] ResizeObserver for chart canvas */
+                const resizeObserver = new ResizeObserver(() => { drawChart(); });
+                resizeObserver.observe(canvas);
+                return () => { resizeObserver.disconnect(); };
             }, [simulationData]);
-
+            /* ============================================================
+             * 動能/面積 圖表 Canvas
+             * ============================================================ */
             useEffect(() => {
                 const canvas = energyCanvasRef.current;
-                if (!canvas) return; // 防禦性編程：阻斷 Null 參照崩潰
+                if (!canvas) return;
                 
                 const ctx = canvas.getContext('2d');
+                if (!ctx) return;
                 const traj = simulationData.data;
-
-                const dpr = window.devicePixelRatio || 1;
-                const rect = canvas.getBoundingClientRect();
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                ctx.scale(dpr, dpr);
-                const w = rect.width;
-                const h = rect.height;
-
-                ctx.clearRect(0,0,w,h);
-                if (traj.length === 0) return;
-
-                const padding = 30;
-                const graphW = w - padding * 2;
-                const graphH = h - padding - 15;
-
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                ctx.lineWidth = 1;
-                for (let i = 0; i <= 4; i++) {
-                    const y = 15 + (graphH / 4) * i;
+                const drawEnergy = () => {
+                    const dpr = window.devicePixelRatio || 1;
+                    const rect = canvas.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) return;
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                    const w = rect.width;
+                    const h = rect.height;
+                    ctx.clearRect(0,0,w,h);
+                    if (traj.length === 0) return;
+                    const padding = 30;
+                    const graphW = w - padding * 2;
+                    const graphH = h - padding - 15;
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+                    ctx.lineWidth = 1;
+                    for (let i = 0; i <= 4; i++) {
+                        const y = 15 + (graphH / 4) * i;
+                        ctx.beginPath();
+                        ctx.moveTo(padding, y);
+                        ctx.lineTo(w - padding, y);
+                        ctx.stroke();
+                    }
                     ctx.beginPath();
-                    ctx.moveTo(padding, y);
-                    ctx.lineTo(w - padding, y);
+                    traj.forEach((pt, idx) => {
+                        const xCoord = padding + (pt.z / 13.4) * graphW;
+                        const yCoord = 15 + graphH - (pt.kineticEnergy / 80) * graphH;
+                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
+                        else ctx.lineTo(xCoord, yCoord);
+                    });
+                    ctx.strokeStyle = '#FFD60A';
+                    ctx.lineWidth = 2.5;
                     ctx.stroke();
-                }
-
-                ctx.beginPath();
-                traj.forEach((pt, idx) => {
-                    const xCoord = padding + (pt.z / 13.4) * graphW;
-                    const yCoord = 15 + graphH - (pt.kineticEnergy / 80) * graphH;
-                    if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                    else ctx.lineTo(xCoord, yCoord);
-                });
-                ctx.strokeStyle = '#FFD60A';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-
-                ctx.beginPath();
-                traj.forEach((pt, idx) => {
-                    const xCoord = padding + (pt.z / 13.4) * graphW;
-                    const normalizedArea = (pt.area - 0.0015) / (0.0040 - 0.0015);
-                    const yCoord = 15 + graphH - normalizedArea * graphH;
-                    if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                    else ctx.lineTo(xCoord, yCoord);
-                });
-                ctx.strokeStyle = '#64D2FF';
-                ctx.lineWidth = 1.8;
-                ctx.stroke();
-
-                ctx.fillStyle = '#86868B';
-                ctx.font = '10px sans-serif';
-                ctx.fillText('0m', padding, h - 5);
-                ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
-                ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+                    ctx.beginPath();
+                    traj.forEach((pt, idx) => {
+                        const xCoord = padding + (pt.z / 13.4) * graphW;
+                        const normalizedArea = (pt.area - 0.0015) / (0.0040 - 0.0015);
+                        const yCoord = 15 + graphH - normalizedArea * graphH;
+                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
+                        else ctx.lineTo(xCoord, yCoord);
+                    });
+                    ctx.strokeStyle = '#64D2FF';
+                    ctx.lineWidth = 1.8;
+                    ctx.stroke();
+                    ctx.fillStyle = '#86868B';
+                    ctx.font = '10px sans-serif';
+                    ctx.fillText('0m', padding, h - 5);
+                    ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
+                    ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+                };
+                drawEnergy();
+                /* [Bug #5 Fix] ResizeObserver for energy canvas */
+                const resizeObserver = new ResizeObserver(() => { drawEnergy(); });
+                resizeObserver.observe(canvas);
+                return () => { resizeObserver.disconnect(); };
             }, [simulationData]);
-
-            const currentFrame = simulationData.data[progressRef.current] || { speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15 };
+            /* 使用 displayFrame state 取代舊的 progressRef 快照 */
+            const currentFrame = displayFrame;
             const elasticEnergy = (0.5 * 0.0052 * Math.pow(v0Kmh / 3.6, 2) * (tension / 30)).toFixed(1);
-
             return (
                 <div className="flex flex-col min-h-screen px-4 md:px-10 py-6 max-w-[1400px] mx-auto">
                     
@@ -619,10 +744,9 @@
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-xs font-mono text-[#86868B]">系統版本: v3.1 (Stable Dashboard)</span>
+                            <span className="text-xs font-mono text-[#86868B]">系統版本: v3.2 (Stabilized)</span>
                         </div>
                     </header>
-
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow mb-6">
                         
                         <div className="lg:col-span-4 flex flex-col gap-6">
@@ -638,7 +762,6 @@
                                     </button>
                                 ))}
                             </div>
-
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[320px]">
                                 <div className="absolute top-0 right-0 p-6 opacity-5">
                                     <i className={`fa-solid ${slides[activeSlide].icon} text-7xl`}></i>
@@ -651,20 +774,16 @@
                                         </div>
                                         <h2 className="text-md font-semibold text-white">{slides[activeSlide].title}</h2>
                                     </div>
-
                                     <p className="text-xs text-[#86868B] leading-relaxed mb-4">
                                         {slides[activeSlide].text}
                                     </p>
-
                                     <div className="bg-black/60 rounded-xl p-4 mb-4 border border-white/5 flex items-center justify-center">
                                         <Latex math={slides[activeSlide].formula} block={true} />
                                     </div>
-
                                     <p className="text-xs text-slate-300 leading-relaxed border-l-2 border-[#BF5AF2] pl-3 py-1">
                                         <span className="font-semibold text-white">結論：</span>{slides[activeSlide].conclusion}
                                     </p>
                                 </div>
-
                                 <div className="mt-4 pt-3 border-t border-[#2c2c2e] flex justify-between items-center text-xs text-[#86868B]">
                                     <span>👉 同步理論與實體沙盒</span>
                                     <button 
@@ -675,7 +794,6 @@
                                     </button>
                                 </div>
                             </div>
-
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] shadow-xl flex-grow">
                                 <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                                     <i className="fa-solid fa-sliders text-[#30D158]"></i>
@@ -685,7 +803,7 @@
                                 <div className="space-y-4">
                                     <div>
                                         <div className="flex justify-between items-baseline mb-1">
-                                            <span className="text-[#86868B] text-xs font-medium">出球初速 ($v_0$)</span>
+                                            <span className="text-[#86868B] text-xs font-medium">出球初速 (v₀)</span>
                                             <span className="text-white font-mono font-semibold text-sm">{v0Kmh} <span className="text-[10px] text-[#86868B]">km/h</span></span>
                                         </div>
                                         <input 
@@ -694,7 +812,6 @@
                                             className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#0A84FF]"
                                         />
                                     </div>
-
                                     <div>
                                         <div className="flex justify-between items-baseline mb-1">
                                             <span className="text-[#86868B] text-xs font-medium">拍床張力 (Tension)</span>
@@ -706,7 +823,6 @@
                                             className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#FF453A]"
                                         />
                                     </div>
-
                                     <div>
                                         <span className="text-[#86868B] text-xs font-medium block mb-1">裙襬氣動材質</span>
                                         <div className="flex bg-black rounded-lg p-1 border border-[#2c2c2e]">
@@ -724,7 +840,6 @@
                                             </button>
                                         </div>
                                     </div>
-
                                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#2c2c2e]">
                                         <div>
                                             <label className="text-[10px] text-[#86868B] block mb-1">場地風速: {windSpeed} m/s</label>
@@ -745,9 +860,7 @@
                                     </div>
                                 </div>
                             </div>
-
                         </div>
-
                         <div className="lg:col-span-8 flex flex-col">
                             
                             <div className="bg-[#1C1C1E] rounded-3xl border border-[#2c2c2e] shadow-2xl relative overflow-hidden flex flex-col flex-grow min-h-[450px]">
@@ -771,16 +884,19 @@
                                         </span>
                                     </div>
                                 </div>
-
+                                {/* [Bug #6 Fix] 加入 touch 事件支援 */}
                                 <canvas 
                                     ref={mainCanvasRef} 
                                     onMouseDown={handleMouseDown}
                                     onMouseMove={handleMouseMove}
                                     onMouseUp={handleMouseUpOrLeave}
                                     onMouseLeave={handleMouseUpOrLeave}
+                                    onTouchStart={handleTouchStart}
+                                    onTouchMove={handleTouchMove}
+                                    onTouchEnd={handleTouchEnd}
                                     className="w-full h-full min-h-[400px] flex-grow cursor-grab active:cursor-grabbing"
+                                    style={{ touchAction: 'none' }}
                                 />
-
                                 <div className="absolute bottom-5 left-5 right-5 z-10 grid grid-cols-3 gap-4 pointer-events-none">
                                     <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
                                         <div className="text-[#86868B] text-[10px] mb-1 uppercase tracking-wider">瞬時時速</div>
@@ -804,7 +920,6 @@
                             </div>
                         </div>
                     </div>
-
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         
                         <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-lg">
@@ -829,7 +944,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div className="flex justify-center gap-3 mt-4">
                                 <button 
                                     onClick={() => setIsPlaying(!isPlaying)}
@@ -845,7 +959,6 @@
                                 </button>
                             </div>
                         </div>
-
                         <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
                             <div className="flex justify-between items-center mb-2">
                                 <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">氣動衰減動態特徵</h3>
@@ -856,7 +969,6 @@
                             </div>
                             <canvas ref={chartCanvasRef} className="w-full h-full min-h-[130px] flex-grow" />
                         </div>
-
                         <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
                             <div className="flex justify-between items-center mb-2">
                                 <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">動能損耗與微觀形變</h3>
@@ -867,14 +979,17 @@
                             </div>
                             <canvas ref={energyCanvasRef} className="w-full h-full min-h-[130px] flex-grow" />
                         </div>
-
                     </div>
                 </div>
             );
         }
-
+        /* [Bug #1 Fix] 用 ErrorBoundary 包裹 App，防止 render error 導致空白頁 */
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(
+            <ErrorBoundary>
+                <App />
+            </ErrorBoundary>
+        );
     </script>
 </body>
 </html>
