@@ -3,8 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Badminton Digital Twin</title>
+    <title>羽球殺球流體力學與世界最快球速分析 — Digital Twin</title>
     
+    <!-- 全部使用 cdnjs (Cloudflare 全球 CDN)，不使用 unpkg.com -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tailwind 使用 cdnjs 備援 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -17,91 +25,82 @@
             }
         }
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        /* Loading Screen */
+        #loading-screen {
+            position: fixed; inset: 0; z-index: 100000;
+            background: #000;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+            transition: opacity 0.5s ease;
+        }
+        #loading-screen.fade-out { opacity: 0; pointer-events: none; }
+        .loading-spinner {
+            width: 40px; height: 40px;
+            border: 3px solid rgba(255,255,255,0.1);
+            border-top-color: #0A84FF;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loading-text { color: #86868B; font-size: 13px; margin-top: 16px; letter-spacing: 0.5px; }
+        .loading-error { color: #FF453A; font-size: 14px; margin-top: 20px; max-width: 400px; text-align: center; line-height: 1.6; display: none; }
         /* Apple Range Slider styling */
         input[type="range"]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: #ffffff;
-            cursor: pointer;
-            transition: transform 0.1s ease, background 0.1s ease;
+            -webkit-appearance: none; appearance: none;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #ffffff; cursor: pointer;
+            transition: transform 0.1s ease;
             box-shadow: 0 1px 4px rgba(0,0,0,0.4);
         }
-        input[type="range"]::-webkit-slider-thumb:hover {
-            transform: scale(1.2);
-        }
-        /* Custom Scrollbar for Pro feeling */
-        ::-webkit-scrollbar {
-            width: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #000000;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #2c2c2e;
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #3a3a3c;
-        }
-        /* [Bug #8 Fix] CDN 載入失敗時的 fallback 樣式 */
-        #cdn-error {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: #000;
-            color: #FF453A;
-            font-family: -apple-system, sans-serif;
-            z-index: 99999;
-            padding: 40px;
-        }
-        #cdn-error h1 { font-size: 24px; margin-bottom: 16px; }
-        #cdn-error p { color: #86868B; font-size: 14px; line-height: 1.6; }
-        #cdn-error code { background: #1C1C1E; padding: 2px 6px; border-radius: 4px; color: #FF9F0A; }
+        input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #000000; }
+        ::-webkit-scrollbar-thumb { background: #2c2c2e; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #3a3a3c; }
+        /* Feather animation */
+        @keyframes featherPulse { 0%,100%{ opacity:0.7; } 50%{ opacity:1; } }
     </style>
 </head>
 <body class="bg-black text-[#F5F5F7] min-h-screen overflow-x-hidden antialiased">
-    <!-- [Bug #8 Fix] CDN 載入失敗時的 fallback 訊息 -->
-    <div id="cdn-error">
-        <h1>⚠️ 系統載入失敗</h1>
-        <p>部分必要的 CDN 資源載入失敗，請檢查網路連線後重新整理頁面。</p>
-        <p style="margin-top:12px;">失敗的資源：<span id="cdn-error-detail"></span></p>
-        <p style="margin-top:20px;">按 <code>Ctrl+Shift+R</code> (Windows) 或 <code>Cmd+Shift+R</code> (Mac) 強制重新載入。</p>
+    <!-- Loading Screen -->
+    <div id="loading-screen">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">正在初始化模擬引擎...</div>
+        <div class="loading-error" id="loading-error"></div>
     </div>
     <div id="root"></div>
-    <!-- [Bug #8 Fix] CDN 載入檢測 -->
+    <!-- CDN 載入檢測 + Loading Screen 控制 -->
     <script>
-        (function checkCDN() {
+        (function() {
             var missing = [];
             if (typeof React === 'undefined') missing.push('React');
             if (typeof ReactDOM === 'undefined') missing.push('ReactDOM');
             if (typeof Babel === 'undefined') missing.push('Babel');
-            if (typeof katex === 'undefined') missing.push('KaTeX');
             if (missing.length > 0) {
-                var el = document.getElementById('cdn-error');
-                var detail = document.getElementById('cdn-error-detail');
-                if (el) el.style.display = 'block';
-                if (detail) detail.textContent = missing.join(', ');
+                var errEl = document.getElementById('loading-error');
+                if (errEl) {
+                    errEl.style.display = 'block';
+                    errEl.innerHTML = '⚠️ CDN 資源載入失敗：<strong>' + missing.join(', ') + '</strong><br>請檢查網路連線後按 <code style="background:#1C1C1E;padding:2px 6px;border-radius:4px;color:#FF9F0A;">Cmd+Shift+R</code> 重新載入。';
+                }
+                var spinner = document.querySelector('.loading-spinner');
+                if (spinner) spinner.style.borderTopColor = '#FF453A';
+                var txt = document.querySelector('.loading-text');
+                if (txt) txt.textContent = '載入失敗';
+                return; // 阻止後續執行
             }
+            // CDN 正常，延遲隱藏 loading screen（等 Babel 編譯完成）
+            window.__hideLoading = function() {
+                var ls = document.getElementById('loading-screen');
+                if (ls) { ls.classList.add('fade-out'); setTimeout(function(){ ls.remove(); }, 600); }
+            };
         })();
     </script>
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
         /* ============================================================
-         * [Bug #1 Fix] React Error Boundary
-         * React 18 Production 模式下，render 階段的任何未攔截 error
-         * 都會靜默卸載整個 component tree，造成空白頁面。
-         * 加入 ErrorBoundary 後會 catch error 並顯示 fallback UI。
+         * React Error Boundary — 防止 render error 導致空白頁
          * ============================================================ */
         class ErrorBoundary extends React.Component {
             constructor(props) {
@@ -118,35 +117,30 @@
                 if (this.state.hasError) {
                     return (
                         <div style={{
-                            position: 'fixed', inset: 0, background: '#000',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            fontFamily: '-apple-system, sans-serif', padding: '40px'
+                            position:'fixed',inset:0,background:'#000',
+                            display:'flex',alignItems:'center',justifyContent:'center',
+                            fontFamily:'-apple-system, sans-serif',padding:'40px'
                         }}>
-                            <div style={{ maxWidth: '500px', textAlign: 'center' }}>
-                                <div style={{ fontSize: '48px', marginBottom: '16px' }}>⚠️</div>
-                                <h1 style={{ color: '#FF453A', fontSize: '22px', fontWeight: 600, marginBottom: '12px' }}>
+                            <div style={{ maxWidth:'500px',textAlign:'center' }}>
+                                <div style={{ fontSize:'48px',marginBottom:'16px' }}>⚠️</div>
+                                <h1 style={{ color:'#FF453A',fontSize:'22px',fontWeight:600,marginBottom:'12px' }}>
                                     系統渲染錯誤
                                 </h1>
-                                <p style={{ color: '#86868B', fontSize: '14px', lineHeight: '1.6', marginBottom: '20px' }}>
+                                <p style={{ color:'#86868B',fontSize:'14px',lineHeight:'1.6',marginBottom:'20px' }}>
                                     模擬引擎遇到未預期的錯誤。請嘗試重新整理頁面。
                                 </p>
                                 <pre style={{
-                                    background: '#1C1C1E', color: '#FF9F0A', padding: '16px',
-                                    borderRadius: '12px', fontSize: '12px', textAlign: 'left',
-                                    overflowX: 'auto', marginBottom: '20px', border: '1px solid #2c2c2e'
+                                    background:'#1C1C1E',color:'#FF9F0A',padding:'16px',
+                                    borderRadius:'12px',fontSize:'12px',textAlign:'left',
+                                    overflowX:'auto',marginBottom:'20px',border:'1px solid #2c2c2e'
                                 }}>
                                     {this.state.error && this.state.error.toString()}
                                 </pre>
-                                <button
-                                    onClick={() => window.location.reload()}
-                                    style={{
-                                        background: '#0A84FF', color: '#fff', border: 'none',
-                                        padding: '10px 24px', borderRadius: '10px', fontSize: '14px',
-                                        fontWeight: 600, cursor: 'pointer'
-                                    }}
-                                >
-                                    重新整理頁面
-                                </button>
+                                <button onClick={() => window.location.reload()} style={{
+                                    background:'#0A84FF',color:'#fff',border:'none',
+                                    padding:'10px 24px',borderRadius:'10px',fontSize:'14px',
+                                    fontWeight:600,cursor:'pointer'
+                                }}>重新整理頁面</button>
                             </div>
                         </div>
                     );
@@ -159,17 +153,222 @@
             useEffect(() => {
                 if (containerRef.current && window.katex) {
                     try {
-                        window.katex.render(math, containerRef.current, {
-                            displayMode: block,
-                            throwOnError: false
-                        });
-                    } catch (e) {
-                        containerRef.current.textContent = math;
-                    }
+                        window.katex.render(math, containerRef.current, { displayMode: block, throwOnError: false });
+                    } catch (e) { containerRef.current.textContent = math; }
                 }
             }, [math, block]);
             return <span ref={containerRef} />;
         }
+        /* ============================================================
+         * 🔬 羽毛微結構收縮剖面動畫元件
+         * ============================================================ */
+        function FeatherCrossSection({ currentSpeed, material }) {
+            const canvasRef = useRef(null);
+            const animRef = useRef(null);
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                const w = rect.width;
+                const h = rect.height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const numFeathers = 16;
+                const maxRadius = Math.min(w, h) * 0.38;
+                const minRadius = maxRadius * 0.55;
+                const corkRadius = maxRadius * 0.18;
+                let animProgress = 0;
+                const draw = () => {
+                    ctx.clearRect(0, 0, w, h);
+                    /* 計算收縮比例 */
+                    const speedMs = currentSpeed / 3.6;
+                    let contractionTarget;
+                    if (material === 'natural') {
+                        contractionTarget = 1 - Math.exp(-0.00035 * speedMs * speedMs);
+                    } else {
+                        contractionTarget = (1 - Math.exp(-0.00012 * speedMs * speedMs)) * 0.15;
+                    }
+                    animProgress += (contractionTarget - animProgress) * 0.08;
+                    const contraction = animProgress;
+                    const currentRadius = maxRadius - (maxRadius - minRadius) * contraction;
+                    /* 速度標示圓環 */
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, maxRadius + 6, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    /* 繪製 16 根羽毛 */
+                    for (let i = 0; i < numFeathers; i++) {
+                        const baseAngle = (i / numFeathers) * Math.PI * 2 - Math.PI / 2;
+                        const inwardAngle = contraction * 0.25;
+                        const angle = baseAngle + (i % 2 === 0 ? inwardAngle : -inwardAngle);
+                        const featherLen = currentRadius - corkRadius;
+                        const startX = cx + Math.cos(angle) * corkRadius;
+                        const startY = cy + Math.sin(angle) * corkRadius;
+                        const endX = cx + Math.cos(angle) * currentRadius;
+                        const endY = cy + Math.sin(angle) * currentRadius;
+                        /* 羽片寬度隨收縮變窄 */
+                        const featherWidth = (1 - contraction * 0.6) * 8;
+                        const perpX = -Math.sin(angle) * featherWidth;
+                        const perpY = Math.cos(angle) * featherWidth;
+                        /* 羽毛漸層 */
+                        const grad = ctx.createLinearGradient(startX, startY, endX, endY);
+                        if (material === 'natural') {
+                            const hue = 30 + contraction * 20;
+                            grad.addColorStop(0, `hsla(${hue}, 60%, 70%, 0.9)`);
+                            grad.addColorStop(1, `hsla(${hue}, 40%, 50%, 0.5)`);
+                        } else {
+                            grad.addColorStop(0, 'rgba(200, 200, 210, 0.8)');
+                            grad.addColorStop(1, 'rgba(150, 150, 160, 0.4)');
+                        }
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.quadraticCurveTo(
+                            startX + (endX - startX) * 0.5 + perpX * 1.5,
+                            startY + (endY - startY) * 0.5 + perpY * 1.5,
+                            endX, endY
+                        );
+                        ctx.quadraticCurveTo(
+                            startX + (endX - startX) * 0.5 - perpX * 1.5,
+                            startY + (endY - startY) * 0.5 - perpY * 1.5,
+                            startX, startY
+                        );
+                        ctx.fillStyle = grad;
+                        ctx.fill();
+                        /* 羽軸 */
+                        ctx.beginPath();
+                        ctx.moveTo(startX, startY);
+                        ctx.lineTo(endX, endY);
+                        ctx.strokeStyle = material === 'natural' ? 'rgba(180,140,80,0.6)' : 'rgba(180,180,190,0.4)';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                    /* 軟木底座 */
+                    const corkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, corkRadius);
+                    corkGrad.addColorStop(0, '#D4A06A');
+                    corkGrad.addColorStop(1, '#8B6542');
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, corkRadius, 0, Math.PI * 2);
+                    ctx.fillStyle = corkGrad;
+                    ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    /* 面積指示環 */
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, currentRadius, 0, Math.PI * 2);
+                    ctx.strokeStyle = material === 'natural' ? 'rgba(48,209,88,0.4)' : 'rgba(100,210,255,0.3)';
+                    ctx.lineWidth = 1.5;
+                    ctx.setLineDash([4, 4]);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    /* 文字標注 */
+                    ctx.fillStyle = '#86868B';
+                    ctx.font = '10px -apple-system, sans-serif';
+                    ctx.textAlign = 'center';
+                    const areaVal = material === 'natural'
+                        ? (17 + (35 - 17) * (1 - contraction)).toFixed(1)
+                        : (30.8 + (35 - 30.8) * (1 - contraction * 0.15)).toFixed(1);
+                    ctx.fillText(`A = ${areaVal} cm²`, cx, h - 8);
+                    const contrPct = (contraction * 100).toFixed(0);
+                    ctx.fillStyle = contraction > 0.5 ? '#FF453A' : '#30D158';
+                    ctx.fillText(`收縮 ${contrPct}%`, cx, 14);
+                    animRef.current = requestAnimationFrame(draw);
+                };
+                draw();
+                return () => cancelAnimationFrame(animRef.current);
+            }, [currentSpeed, material]);
+            return <canvas ref={canvasRef} className="w-full h-full" style={{minHeight:'140px'}} />;
+        }
+        /* ============================================================
+         * 🎯 跨運動球速對比圖元件
+         * ============================================================ */
+        function SpeedComparisonChart({ shuttleSpeed }) {
+            const canvasRef = useRef(null);
+            const sports = [
+                { name: '🏸 羽球殺球', speed: shuttleSpeed, color: '#30D158', dynamic: true },
+                { name: '⛳ 高爾夫開球', speed: 339, color: '#FFD60A', dynamic: false },
+                { name: '🎾 網球發球', speed: 263, color: '#BF5AF2', dynamic: false },
+                { name: '🏎️ F1 極速', speed: 372, color: '#FF453A', dynamic: false },
+                { name: '⚾ 棒球快速球', speed: 170, color: '#0A84FF', dynamic: false },
+                { name: '⚽ 足球射門', speed: 131, color: '#64D2FF', dynamic: false },
+            ];
+            useEffect(() => {
+                const canvas = canvasRef.current;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return;
+                const dpr = window.devicePixelRatio || 1;
+                const rect = canvas.getBoundingClientRect();
+                if (rect.width === 0) return;
+                canvas.width = rect.width * dpr;
+                canvas.height = rect.height * dpr;
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                const w = rect.width;
+                const h = rect.height;
+                const sorted = [...sports].sort((a, b) => b.speed - a.speed);
+                const maxSpeed = Math.max(600, shuttleSpeed + 50);
+                const barH = 18;
+                const gap = 6;
+                const labelW = 100;
+                const barAreaW = w - labelW - 60;
+                const startY = 8;
+                ctx.clearRect(0, 0, w, h);
+                sorted.forEach((s, idx) => {
+                    const y = startY + idx * (barH + gap);
+                    const barWidth = (s.speed / maxSpeed) * barAreaW;
+                    /* 標籤 */
+                    ctx.fillStyle = s.dynamic ? '#FFFFFF' : '#86868B';
+                    ctx.font = `${s.dynamic ? 'bold ' : ''}11px -apple-system, sans-serif`;
+                    ctx.textAlign = 'right';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(s.name, labelW - 8, y + barH / 2);
+                    /* 背景條 */
+                    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+                    ctx.beginPath();
+                    ctx.roundRect(labelW, y, barAreaW, barH, 4);
+                    ctx.fill();
+                    /* 實際速度條 */
+                    const grad = ctx.createLinearGradient(labelW, 0, labelW + barWidth, 0);
+                    grad.addColorStop(0, s.color + '33');
+                    grad.addColorStop(1, s.color);
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.roundRect(labelW, y, Math.max(barWidth, 4), barH, 4);
+                    ctx.fill();
+                    /* 發光效果 (動態項目) */
+                    if (s.dynamic) {
+                        ctx.shadowBlur = 8;
+                        ctx.shadowColor = s.color;
+                        ctx.fillStyle = s.color;
+                        ctx.beginPath();
+                        ctx.roundRect(labelW, y, Math.max(barWidth, 4), barH, 4);
+                        ctx.fill();
+                        ctx.shadowBlur = 0;
+                    }
+                    /* 速度數字 */
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.font = `${s.dynamic ? 'bold ' : ''}11px -apple-system, monospace`;
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${Math.round(s.speed)}`, labelW + barWidth + 6, y + barH / 2);
+                });
+                /* km/h 標注 */
+                ctx.fillStyle = '#48484A';
+                ctx.font = '9px -apple-system, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText('km/h', w - 4, startY + sorted.length * (barH + gap) + 4);
+            }, [shuttleSpeed]);
+            return <canvas ref={canvasRef} className="w-full" style={{height: '168px'}} />;
+        }
+        /* ============================================================
+         * 主應用
+         * ============================================================ */
         function App() {
             const [v0Kmh, setV0Kmh] = useState(565);
             const [tension, setTension] = useState(32);
@@ -184,10 +383,11 @@
             const [windSpeed, setWindSpeed] = useState(0); 
             const [windDir, setWindDir] = useState(180); 
             const [activeSlide, setActiveSlide] = useState(0);
-            /* [Bug #4 Fix] 新增 displayFrame state，用於即時更新 HUD */
             const [displayFrame, setDisplayFrame] = useState({
                 speed: 565, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15
             });
+            /* 底部分析面板 tab */
+            const [analysisTab, setAnalysisTab] = useState('data');
             const mainCanvasRef = useRef(null);
             const chartCanvasRef = useRef(null);
             const energyCanvasRef = useRef(null);
@@ -197,7 +397,6 @@
             
             const isDraggingRef = useRef(false);
             const previousMousePosition = useRef({ x: 0, y: 0 });
-            /* [Bug #7 Fix] 用 useRef 取代 useMemo 來存放 mutable 的 windParticles */
             const windParticlesRef = useRef(null);
             if (windParticlesRef.current === null) {
                 const arr = [];
@@ -210,6 +409,21 @@
                     });
                 }
                 windParticlesRef.current = arr;
+            }
+            /* 流場粒子 (3D 場景內) */
+            const flowParticlesRef = useRef(null);
+            if (flowParticlesRef.current === null) {
+                const arr = [];
+                for(let i=0; i<60; i++) {
+                    arr.push({
+                        ox: (Math.random() - 0.5) * 1.2,
+                        oy: (Math.random() - 0.5) * 1.2,
+                        oz: (Math.random() - 0.5) * 2.5,
+                        life: Math.random(),
+                        speed: 0.3 + Math.random() * 0.7,
+                    });
+                }
+                flowParticlesRef.current = arr;
             }
             const slides = [
                 {
@@ -265,6 +479,9 @@
                 setCameraYaw(defaultYaw);
                 setCameraPitch(defaultPitch);
             };
+            /* ============================================================
+             * 物理模擬引擎 (ODE Solver)
+             * ============================================================ */
             const simulationData = useMemo(() => {
                 const m = 0.0052; 
                 const rho = 1.225; 
@@ -272,22 +489,21 @@
                 const A0 = 0.0035; 
                 const Amin = 0.0017; 
                 const g = 9.81; 
-                const dt = 0.0015; 
+                const dt = 0.0015;
+                const mu = 1.81e-5; /* 空氣動力黏度 (Pa·s) */
+                const D = 0.067;    /* 羽球特徵直徑 (m) */
                 let t = 0;
                 let v_mag = v0Kmh / 3.6; 
                 let angle = -1 * (4 + (v0Kmh / 600) * 12) * (Math.PI / 180); 
                 let vz = v_mag * Math.cos(angle); 
                 let vy = v_mag * Math.sin(angle); 
                 let vx = 0; 
-                let z = 0;
-                let y = 3.15; 
-                let x = 0; 
+                let z = 0, y = 3.15, x = 0; 
                 const windRad = (windDir * Math.PI) / 180;
                 const wx = windSpeed * Math.sin(windRad);
                 const wz = windSpeed * Math.cos(windRad);
                 const data = [];
                 let maxDrag = 0;
-                /* [Bug #3 Fix] 加入最大迭代次數保護，防止極端參數凍結瀏覽器 */
                 let iterations = 0;
                 const MAX_ITERATIONS = 50000;
                 while (y >= 0 && z <= 15 && iterations < MAX_ITERATIONS) {
@@ -295,7 +511,8 @@
                     const vrx = vx - wx;
                     const vry = vy;
                     const vrz = vz - wz;
-                    const vr_mag = Math.sqrt(vrx * vrx + vry * vry + vrz * vrz);
+                    /* ★ 除以零防護：Math.max 強制底限 */
+                    const vr_mag = Math.max(Math.sqrt(vrx * vrx + vry * vry + vrz * vrz), 0.0001);
                     let A = A0;
                     if (material === 'natural') {
                         A = Amin + (A0 - Amin) * Math.exp(-0.00035 * vr_mag * vr_mag);
@@ -304,46 +521,45 @@
                     }
                     const Fd = 0.5 * rho * vr_mag * vr_mag * Cd_base * A;
                     if (Fd > maxDrag) maxDrag = Fd;
-                    const ax = vr_mag === 0 ? 0 : -(Fd / m) * (vrx / vr_mag);
-                    const ay = vr_mag === 0 ? -g : -g - (Fd / m) * (vry / vr_mag);
-                    const az = vr_mag === 0 ? 0 : -(Fd / m) * (vrz / vr_mag);
+                    /* 加速度計算（vr_mag 已有底限保護，不會除以零） */
+                    const ax = -(Fd / m) * (vrx / vr_mag);
+                    const ay = -g - (Fd / m) * (vry / vr_mag);
+                    const az = -(Fd / m) * (vrz / vr_mag);
                     vx += ax * dt;
                     vy += ay * dt;
                     vz += az * dt;
                     x += vx * dt;
                     y += vy * dt;
                     z += vz * dt;
-                    /* 防止 NaN 傳播：一旦出現 NaN 立即中斷 */
                     if (isNaN(x) || isNaN(y) || isNaN(z)) break;
                     v_mag = Math.sqrt(vx * vx + vy * vy + vz * vz);
                     const kineticEnergy = 0.5 * m * v_mag * v_mag;
+                    /* 雷諾數計算 Re = ρvD/μ */
+                    const Re = (rho * vr_mag * D) / mu;
                     t += dt;
                     if (Math.floor(t * 10000) % 30 === 0) {
                         data.push({
-                            time: t,
-                            x: x, y: y, z: z,
+                            time: t, x, y, z,
                             speed: v_mag * 3.6,
-                            drag: Fd,
-                            area: A,
-                            kineticEnergy: kineticEnergy
+                            drag: Fd, area: A,
+                            kineticEnergy,
+                            reynolds: Re
                         });
                     }
                 }
                 return { data, maxDrag };
             }, [v0Kmh, material, windSpeed, windDir]);
-            /* [Bug #2 Fix] 當 simulationData 變化時，立即重置 progressRef
-             * 防止舊的 progressRef.current 值超出新的 data 陣列長度 */
+            /* 當 simulationData 變化時重置進度 */
             useEffect(() => {
                 progressRef.current = 0;
                 frameCounterRef.current = 0;
-                /* 同步更新 displayFrame 為初始值 */
                 if (simulationData.data.length > 0) {
                     setDisplayFrame(simulationData.data[0]);
                 } else {
-                    setDisplayFrame({ speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15 });
+                    setDisplayFrame({ speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15, reynolds: 0 });
                 }
             }, [simulationData]);
-            /* --- 相機拖曳事件 --- */
+            /* 相機拖曳事件 */
             const handleMouseDown = (e) => {
                 isDraggingRef.current = true;
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
@@ -352,18 +568,12 @@
                 if (!isDraggingRef.current) return;
                 const deltaX = e.clientX - previousMousePosition.current.x;
                 const deltaY = e.clientY - previousMousePosition.current.y;
-                setCameraYaw(prev => {
-                    const next = prev - deltaX * 0.5;
-                    return next > 90 ? 90 : next < -90 ? -90 : next;
-                });
-                setCameraPitch(prev => {
-                    const next = prev - deltaY * 0.3;
-                    return next > 45 ? 45 : next < 5 ? 5 : next;
-                });
+                setCameraYaw(prev => Math.max(-90, Math.min(90, prev - deltaX * 0.5)));
+                setCameraPitch(prev => Math.max(5, Math.min(45, prev - deltaY * 0.3)));
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
             };
             const handleMouseUpOrLeave = () => { isDraggingRef.current = false; };
-            /* [Bug #6 Fix] 觸控事件支援 */
+            /* 觸控支援 */
             const handleTouchStart = (e) => {
                 if (e.touches.length === 1) {
                     isDraggingRef.current = true;
@@ -375,30 +585,21 @@
                 e.preventDefault();
                 const deltaX = e.touches[0].clientX - previousMousePosition.current.x;
                 const deltaY = e.touches[0].clientY - previousMousePosition.current.y;
-                setCameraYaw(prev => {
-                    const next = prev - deltaX * 0.5;
-                    return next > 90 ? 90 : next < -90 ? -90 : next;
-                });
-                setCameraPitch(prev => {
-                    const next = prev - deltaY * 0.3;
-                    return next > 45 ? 45 : next < 5 ? 5 : next;
-                });
+                setCameraYaw(prev => Math.max(-90, Math.min(90, prev - deltaX * 0.5)));
+                setCameraPitch(prev => Math.max(5, Math.min(45, prev - deltaY * 0.3)));
                 previousMousePosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             };
             const handleTouchEnd = () => { isDraggingRef.current = false; };
             /* ============================================================
-             * 主要 3D 場景 Canvas 渲染
+             * 主要 3D Canvas 渲染 (含流場粒子)
              * ============================================================ */
             useEffect(() => {
                 const canvas = mainCanvasRef.current;
                 if (!canvas) return;
-                
                 const ctx = canvas.getContext('2d');
-                if (!ctx) return; /* 防禦性：getContext 可能回傳 null */
+                if (!ctx) return;
                 const traj = simulationData.data;
-                /* [Bug #5 Fix] 使用 ResizeObserver 處理 canvas 尺寸變化 */
-                let width = 0;
-                let height = 0;
+                let width = 0, height = 0;
                 const dpr = window.devicePixelRatio || 1;
                 const resizeCanvas = () => {
                     const rect = canvas.getBoundingClientRect();
@@ -413,164 +614,161 @@
                 const resizeObserver = new ResizeObserver(() => { resizeCanvas(); });
                 resizeObserver.observe(canvas);
                 const project = (x, y, z) => {
-                    const scale = width * 0.054; 
+                    const scale = width * 0.054;
                     const offsetX = width * 0.5;
                     const offsetY = height * 0.64;
-                    
                     const radYaw = (cameraYaw * Math.PI) / 180;
                     const radPitch = (cameraPitch * Math.PI) / 180;
-                    const cx = x;
-                    const cy = y;
-                    const cz = z - 6.7; 
-                    let rotX = cx * Math.cos(radYaw) - cz * Math.sin(radYaw);
-                    let rotZ = cx * Math.sin(radYaw) + cz * Math.cos(radYaw);
-                    
-                    const finalY = cy * Math.cos(radPitch) + rotZ * Math.sin(radPitch);
-                    const finalZ = -cy * Math.sin(radPitch) + rotZ * Math.cos(radPitch);
-                    const distance = 16; 
+                    const cz = z - 6.7;
+                    let rotX = x * Math.cos(radYaw) - cz * Math.sin(radYaw);
+                    let rotZ = x * Math.sin(radYaw) + cz * Math.cos(radYaw);
+                    const finalY = y * Math.cos(radPitch) + rotZ * Math.sin(radPitch);
+                    const finalZ = -y * Math.sin(radPitch) + rotZ * Math.cos(radPitch);
+                    const distance = 16;
                     const perspective = distance / (distance + finalZ);
-                    const px = offsetX + rotX * scale * perspective;
-                    const py = offsetY - finalY * scale * perspective;
-                    return { px, py, perspective };
+                    return {
+                        px: offsetX + rotX * scale * perspective,
+                        py: offsetY - finalY * scale * perspective,
+                        perspective
+                    };
                 };
                 const windParticles = windParticlesRef.current;
+                const flowParticles = flowParticlesRef.current;
                 const drawWindParticles = () => {
                     ctx.fillStyle = 'rgba(10, 132, 255, 0.15)';
                     const windRad = (windDir * Math.PI) / 180;
                     const wx = windSpeed * Math.sin(windRad) * 0.05;
                     const wz = windSpeed * Math.cos(windRad) * 0.05;
                     windParticles.forEach(p => {
-                        p.x += wx * p.speedFactor;
-                        p.z += wz * p.speedFactor;
-                        if (p.z > 13.4) p.z = 0;
-                        if (p.z < 0) p.z = 13.4;
-                        if (p.x > 4) p.x = -4;
-                        if (p.x < -4) p.x = 4;
+                        p.x += wx * p.speedFactor; p.z += wz * p.speedFactor;
+                        if (p.z > 13.4) p.z = 0; if (p.z < 0) p.z = 13.4;
+                        if (p.x > 4) p.x = -4; if (p.x < -4) p.x = 4;
                         const pos = project(p.x, p.y, p.z);
                         ctx.beginPath();
                         ctx.arc(pos.px, pos.py, 1.5 * pos.perspective, 0, Math.PI * 2);
                         ctx.fill();
                     });
                 };
+                /* 🌊 流場粒子視覺化 */
+                const drawFlowField = (ballX, ballY, ballZ, speed) => {
+                    const intensity = Math.min(speed / 500, 1);
+                    if (intensity < 0.05) return;
+                    flowParticles.forEach(p => {
+                        p.life += 0.015 * p.speed;
+                        if (p.life > 1) {
+                            p.life = 0;
+                            p.ox = (Math.random() - 0.5) * (1.2 - intensity * 0.6);
+                            p.oy = (Math.random() - 0.5) * (1.2 - intensity * 0.6);
+                            p.oz = -0.5 - Math.random() * 1.5;
+                        }
+                        /* 粒子從球前方往後方流動 */
+                        const pz = p.oz + p.life * 3;
+                        const spread = 1 + p.life * (2 + intensity * 3);
+                        const px = p.ox * spread;
+                        const py = p.oy * spread;
+                        const worldX = ballX + px;
+                        const worldY = ballY + py;
+                        const worldZ = ballZ - pz;
+                        if (worldZ < 0 || worldZ > 14 || worldY < 0) return;
+                        const pos = project(worldX, worldY, worldZ);
+                        const alpha = (1 - p.life) * intensity * 0.5;
+                        const size = (1 + p.life * 2) * pos.perspective;
+                        /* 壓縮波紋效果 (高速時) */
+                        if (intensity > 0.6 && p.life < 0.15) {
+                            ctx.strokeStyle = `rgba(255, 69, 58, ${alpha * 0.6})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.beginPath();
+                            ctx.arc(pos.px, pos.py, (8 + p.life * 30) * pos.perspective * intensity, 
+                                    -Math.PI * 0.3, Math.PI * 0.3);
+                            ctx.stroke();
+                        }
+                        /* 流線粒子 */
+                        const hue = 200 + p.life * 40;
+                        ctx.fillStyle = `hsla(${hue}, 80%, 70%, ${alpha})`;
+                        ctx.beginPath();
+                        ctx.arc(pos.px, pos.py, size, 0, Math.PI * 2);
+                        ctx.fill();
+                    });
+                };
                 const drawCourt = () => {
                     ctx.shadowBlur = 0;
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-                    
                     ctx.fillStyle = 'rgba(13, 85, 52, 0.2)';
                     ctx.beginPath();
-                    const c1 = project(-3.05, 0, 0);
-                    const c2 = project(3.05, 0, 0);
-                    const c3 = project(3.05, 0, 13.4);
-                    const c4 = project(-3.05, 0, 13.4);
-                    ctx.moveTo(c1.px, c1.py); ctx.lineTo(c2.px, c2.py);
-                    ctx.lineTo(c3.px, c3.py); ctx.lineTo(c4.px, c4.py);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-                    ctx.lineWidth = 1.5;
+                    const c1 = project(-3.05,0,0), c2 = project(3.05,0,0);
+                    const c3 = project(3.05,0,13.4), c4 = project(-3.05,0,13.4);
+                    ctx.moveTo(c1.px,c1.py); ctx.lineTo(c2.px,c2.py);
+                    ctx.lineTo(c3.px,c3.py); ctx.lineTo(c4.px,c4.py);
+                    ctx.closePath(); ctx.fill();
+                    ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5;
                     ctx.beginPath();
-                    ctx.moveTo(c1.px, c1.py); ctx.lineTo(c2.px, c2.py);
-                    ctx.lineTo(c3.px, c3.py); ctx.lineTo(c4.px, c4.py);
-                    ctx.closePath();
-                    ctx.stroke();
+                    ctx.moveTo(c1.px,c1.py); ctx.lineTo(c2.px,c2.py);
+                    ctx.lineTo(c3.px,c3.py); ctx.lineTo(c4.px,c4.py);
+                    ctx.closePath(); ctx.stroke();
                     const lines = [
-                        [{x: -2.59, z: 0}, {x: -2.59, z: 13.4}],
-                        [{x: 2.59, z: 0}, {x: 2.59, z: 13.4}],
-                        [{x: -3.05, z: 1.98}, {x: 3.05, z: 1.98}],
-                        [{x: -3.05, z: 11.42}, {x: 3.05, z: 11.42}],
-                        [{x: -3.05, z: 0.76}, {x: 3.05, z: 0.76}],
-                        [{x: -3.05, z: 12.64}, {x: 3.05, z: 12.64}],
-                        [{x: 0, z: 0}, {x: 0, z: 1.98}],
-                        [{x: 0, z: 11.42}, {x: 0, z: 13.4}]
+                        [{x:-2.59,z:0},{x:-2.59,z:13.4}],[{x:2.59,z:0},{x:2.59,z:13.4}],
+                        [{x:-3.05,z:1.98},{x:3.05,z:1.98}],[{x:-3.05,z:11.42},{x:3.05,z:11.42}],
+                        [{x:-3.05,z:0.76},{x:3.05,z:0.76}],[{x:-3.05,z:12.64},{x:3.05,z:12.64}],
+                        [{x:0,z:0},{x:0,z:1.98}],[{x:0,z:11.42},{x:0,z:13.4}]
                     ];
-                    ctx.lineWidth = 1;
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+                    ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(255,255,255,0.15)';
                     lines.forEach(pts => {
                         ctx.beginPath();
-                        pts.forEach((pt, i) => {
-                            const { px, py } = project(pt.x, 0, pt.z);
-                            if (i === 0) ctx.moveTo(px, py);
-                            else ctx.lineTo(px, py);
-                        });
-                        ctx.stroke();
+                        pts.forEach((pt,i) => {
+                            const {px,py} = project(pt.x,0,pt.z);
+                            if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
+                        }); ctx.stroke();
                     });
-                    ctx.fillStyle = 'rgba(10, 132, 255, 0.08)';
-                    ctx.strokeStyle = 'rgba(10, 132, 255, 0.25)';
+                    /* Net */
+                    ctx.fillStyle = 'rgba(10,132,255,0.08)'; ctx.strokeStyle = 'rgba(10,132,255,0.25)';
                     ctx.beginPath();
-                    const n1 = project(-3.05, 0, 6.7);
-                    const n2 = project(3.05, 0, 6.7);
-                    const n3 = project(3.05, 1.55, 6.7);
-                    const n4 = project(-3.05, 1.55, 6.7);
-                    ctx.moveTo(n1.px, n1.py); ctx.lineTo(n2.px, n2.py);
-                    ctx.lineTo(n3.px, n3.py); ctx.lineTo(n4.px, n4.py);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.strokeStyle = 'rgba(10, 132, 255, 0.04)';
-                    for(let i=1; i<10; i++) {
-                        const ratio = i / 10;
-                        const hStart = project(-3.05, 1.55 * ratio, 6.7);
-                        const hEnd = project(3.05, 1.55 * ratio, 6.7);
-                        ctx.beginPath();
-                        ctx.moveTo(hStart.px, hStart.py); ctx.lineTo(hEnd.px, hEnd.py);
-                        ctx.stroke();
+                    const n1=project(-3.05,0,6.7), n2=project(3.05,0,6.7);
+                    const n3=project(3.05,1.55,6.7), n4=project(-3.05,1.55,6.7);
+                    ctx.moveTo(n1.px,n1.py); ctx.lineTo(n2.px,n2.py);
+                    ctx.lineTo(n3.px,n3.py); ctx.lineTo(n4.px,n4.py);
+                    ctx.closePath(); ctx.fill(); ctx.stroke();
+                    ctx.strokeStyle = 'rgba(10,132,255,0.04)';
+                    for(let i=1;i<10;i++){
+                        const r=i/10;
+                        const hs=project(-3.05,1.55*r,6.7), he=project(3.05,1.55*r,6.7);
+                        ctx.beginPath(); ctx.moveTo(hs.px,hs.py); ctx.lineTo(he.px,he.py); ctx.stroke();
                     }
-                    ctx.lineWidth = 3;
-                    ctx.strokeStyle = '#0A84FF';
+                    ctx.lineWidth=3; ctx.strokeStyle='#0A84FF';
                     ctx.beginPath();
-                    ctx.moveTo(n1.px, n1.py); ctx.lineTo(n4.px, n4.py);
-                    ctx.moveTo(n2.px, n2.py); ctx.lineTo(n3.px, n3.py);
+                    ctx.moveTo(n1.px,n1.py); ctx.lineTo(n4.px,n4.py);
+                    ctx.moveTo(n2.px,n2.py); ctx.lineTo(n3.px,n3.py);
                     ctx.stroke();
                 };
                 const drawTrajectory = (idx) => {
                     if (traj.length === 0) return;
-                    /* [Bug #2 Fix 加強] 雙重夾限，確保 index 不越界 */
                     const maxIdx = Math.max(0, Math.min(idx, traj.length - 1));
                     ctx.beginPath();
                     for (let i = 0; i <= maxIdx; i++) {
                         const pt = traj[i];
-                        if (!pt) continue; /* 防禦性跳過 */
-                        const { px, py } = project(pt.x, pt.y, pt.z);
-                        if (i === 0) ctx.moveTo(px, py);
-                        else ctx.lineTo(px, py);
+                        if (!pt) continue;
+                        const {px,py} = project(pt.x, pt.y, pt.z);
+                        if (i === 0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
                     }
-                    ctx.strokeStyle = '#30D158';
-                    ctx.lineWidth = 2.5;
-                    ctx.shadowBlur = 12;
-                    ctx.shadowColor = '#30D158';
-                    ctx.stroke();
-                    ctx.shadowBlur = 0; 
+                    ctx.strokeStyle = '#30D158'; ctx.lineWidth = 2.5;
+                    ctx.shadowBlur = 12; ctx.shadowColor = '#30D158';
+                    ctx.stroke(); ctx.shadowBlur = 0;
                     const current = traj[maxIdx];
-                    if (!current) return; /* 防禦性中斷 */
+                    if (!current) return;
+                    /* 🌊 流場粒子 */
+                    drawFlowField(current.x, current.y, current.z, current.speed);
                     const cPos = project(current.x, current.y, current.z);
                     const sPos = project(current.x, 0, current.z);
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
-                    ctx.setLineDash([4, 4]);
-                    ctx.beginPath();
-                    ctx.moveTo(cPos.px, cPos.py);
-                    ctx.lineTo(sPos.px, sPos.py);
-                    ctx.stroke();
-                    ctx.setLineDash([]); 
+                    ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.setLineDash([4,4]);
+                    ctx.beginPath(); ctx.moveTo(cPos.px,cPos.py); ctx.lineTo(sPos.px,sPos.py);
+                    ctx.stroke(); ctx.setLineDash([]);
                     ctx.fillStyle = 'rgba(0,0,0,0.6)';
-                    ctx.beginPath();
-                    ctx.arc(sPos.px, sPos.py, 6 * cPos.perspective, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.shadowBlur = 15;
-                    ctx.shadowColor = '#FFFFFF';
-                    ctx.beginPath();
-                    ctx.arc(cPos.px, cPos.py, 5 * cPos.perspective, 0, Math.PI * 2);
-                    ctx.fill();
+                    ctx.beginPath(); ctx.arc(sPos.px,sPos.py, 6*cPos.perspective, 0, Math.PI*2); ctx.fill();
+                    ctx.fillStyle = '#FFFFFF'; ctx.shadowBlur = 15; ctx.shadowColor = '#FFFFFF';
+                    ctx.beginPath(); ctx.arc(cPos.px,cPos.py, 5*cPos.perspective, 0, Math.PI*2); ctx.fill();
                     ctx.shadowBlur = 0;
                 };
                 const render = () => {
-                    if (width === 0 || height === 0) {
-                        animationRef.current = requestAnimationFrame(render);
-                        return;
-                    }
-                    ctx.fillStyle = '#070708';
-                    ctx.fillRect(0, 0, width, height);
+                    if (width===0||height===0) { animationRef.current=requestAnimationFrame(render); return; }
+                    ctx.fillStyle = '#070708'; ctx.fillRect(0,0,width,height);
                     drawCourt();
                     if (windSpeed > 0) drawWindParticles();
                     if (isPlaying && traj.length > 0) {
@@ -578,158 +776,119 @@
                         if (progressRef.current >= traj.length) progressRef.current = 0;
                     }
                     drawTrajectory(progressRef.current);
-                    /* [Bug #4 Fix] 每 6 幀更新一次 HUD state（約 10fps），
-                     * 避免每幀都 setState 造成效能問題 */
                     frameCounterRef.current += 1;
                     if (frameCounterRef.current % 6 === 0) {
                         const safeIdx = Math.max(0, Math.min(progressRef.current, traj.length - 1));
                         const frame = traj[safeIdx];
-                        if (frame) {
-                            setDisplayFrame(frame);
-                        }
+                        if (frame) setDisplayFrame(frame);
                     }
                     animationRef.current = requestAnimationFrame(render);
                 };
                 render();
-                return () => {
-                    cancelAnimationFrame(animationRef.current);
-                    resizeObserver.disconnect();
-                };
+                return () => { cancelAnimationFrame(animationRef.current); resizeObserver.disconnect(); };
             }, [simulationData, isPlaying, cameraYaw, cameraPitch, windSpeed, windDir]);
-            /* ============================================================
-             * 速度/阻力 圖表 Canvas
-             * ============================================================ */
+            /* 速度/阻力圖表 */
             useEffect(() => {
                 const canvas = chartCanvasRef.current;
                 if (!canvas) return;
-                
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
                 const traj = simulationData.data;
                 const drawChart = () => {
                     const dpr = window.devicePixelRatio || 1;
                     const rect = canvas.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) return;
-                    canvas.width = rect.width * dpr;
-                    canvas.height = rect.height * dpr;
-                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                    const w = rect.width;
-                    const h = rect.height;
+                    if (rect.width===0||rect.height===0) return;
+                    canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+                    ctx.setTransform(dpr,0,0,dpr,0,0);
+                    const w=rect.width, h=rect.height;
                     ctx.clearRect(0,0,w,h);
-                    if (traj.length === 0) return;
-                    const padding = 30;
-                    const graphW = w - padding * 2;
-                    const graphH = h - padding - 15;
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i <= 4; i++) {
-                        const y = 15 + (graphH / 4) * i;
-                        ctx.beginPath();
-                        ctx.moveTo(padding, y);
-                        ctx.lineTo(w - padding, y);
-                        ctx.stroke();
+                    if (traj.length===0) return;
+                    const padding=30, graphW=w-padding*2, graphH=h-padding-15;
+                    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+                    for(let i=0;i<=4;i++){
+                        const y=15+(graphH/4)*i;
+                        ctx.beginPath(); ctx.moveTo(padding,y); ctx.lineTo(w-padding,y); ctx.stroke();
                     }
                     ctx.beginPath();
-                    traj.forEach((pt, idx) => {
-                        const xCoord = padding + (pt.z / 13.4) * graphW;
-                        const yCoord = 15 + graphH - (pt.speed / 600) * graphH;
-                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                        else ctx.lineTo(xCoord, yCoord);
+                    traj.forEach((pt,idx)=>{
+                        const xc=padding+(pt.z/13.4)*graphW;
+                        const yc=15+graphH-(pt.speed/600)*graphH;
+                        if(idx===0) ctx.moveTo(xc,yc); else ctx.lineTo(xc,yc);
                     });
-                    ctx.strokeStyle = '#BF5AF2';
-                    ctx.lineWidth = 2.5;
-                    ctx.stroke();
+                    ctx.strokeStyle='#BF5AF2'; ctx.lineWidth=2.5; ctx.stroke();
                     ctx.beginPath();
-                    traj.forEach((pt, idx) => {
-                        const xCoord = padding + (pt.z / 13.4) * graphW;
-                        const yCoord = 15 + graphH - (pt.drag / 40) * graphH;
-                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                        else ctx.lineTo(xCoord, yCoord);
+                    traj.forEach((pt,idx)=>{
+                        const xc=padding+(pt.z/13.4)*graphW;
+                        const yc=15+graphH-(pt.drag/40)*graphH;
+                        if(idx===0) ctx.moveTo(xc,yc); else ctx.lineTo(xc,yc);
                     });
-                    ctx.strokeStyle = '#FF453A';
-                    ctx.lineWidth = 1.8;
-                    ctx.stroke();
-                    ctx.fillStyle = '#86868B';
-                    ctx.font = '10px sans-serif';
-                    ctx.fillText('0m', padding, h - 5);
-                    ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
-                    ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+                    ctx.strokeStyle='#FF453A'; ctx.lineWidth=1.8; ctx.stroke();
+                    ctx.fillStyle='#86868B'; ctx.font='10px sans-serif';
+                    ctx.fillText('0m',padding,h-5);
+                    ctx.fillText('6.7m',padding+graphW/2-10,h-5);
+                    ctx.fillText('13.4m',padding+graphW-25,h-5);
                 };
                 drawChart();
-                /* [Bug #5 Fix] ResizeObserver for chart canvas */
-                const resizeObserver = new ResizeObserver(() => { drawChart(); });
-                resizeObserver.observe(canvas);
-                return () => { resizeObserver.disconnect(); };
+                const ro = new ResizeObserver(()=>{drawChart();}); ro.observe(canvas);
+                return ()=>{ro.disconnect();};
             }, [simulationData]);
-            /* ============================================================
-             * 動能/面積 圖表 Canvas
-             * ============================================================ */
+            /* 動能/面積圖表 */
             useEffect(() => {
                 const canvas = energyCanvasRef.current;
                 if (!canvas) return;
-                
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
                 const traj = simulationData.data;
                 const drawEnergy = () => {
                     const dpr = window.devicePixelRatio || 1;
                     const rect = canvas.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) return;
-                    canvas.width = rect.width * dpr;
-                    canvas.height = rect.height * dpr;
-                    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                    const w = rect.width;
-                    const h = rect.height;
+                    if (rect.width===0||rect.height===0) return;
+                    canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
+                    ctx.setTransform(dpr,0,0,dpr,0,0);
+                    const w=rect.width, h=rect.height;
                     ctx.clearRect(0,0,w,h);
-                    if (traj.length === 0) return;
-                    const padding = 30;
-                    const graphW = w - padding * 2;
-                    const graphH = h - padding - 15;
-                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-                    ctx.lineWidth = 1;
-                    for (let i = 0; i <= 4; i++) {
-                        const y = 15 + (graphH / 4) * i;
-                        ctx.beginPath();
-                        ctx.moveTo(padding, y);
-                        ctx.lineTo(w - padding, y);
-                        ctx.stroke();
+                    if (traj.length===0) return;
+                    const padding=30, graphW=w-padding*2, graphH=h-padding-15;
+                    ctx.strokeStyle='rgba(255,255,255,0.05)'; ctx.lineWidth=1;
+                    for(let i=0;i<=4;i++){
+                        const y=15+(graphH/4)*i;
+                        ctx.beginPath(); ctx.moveTo(padding,y); ctx.lineTo(w-padding,y); ctx.stroke();
                     }
                     ctx.beginPath();
-                    traj.forEach((pt, idx) => {
-                        const xCoord = padding + (pt.z / 13.4) * graphW;
-                        const yCoord = 15 + graphH - (pt.kineticEnergy / 80) * graphH;
-                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                        else ctx.lineTo(xCoord, yCoord);
+                    traj.forEach((pt,idx)=>{
+                        const xc=padding+(pt.z/13.4)*graphW;
+                        const yc=15+graphH-(pt.kineticEnergy/80)*graphH;
+                        if(idx===0) ctx.moveTo(xc,yc); else ctx.lineTo(xc,yc);
                     });
-                    ctx.strokeStyle = '#FFD60A';
-                    ctx.lineWidth = 2.5;
-                    ctx.stroke();
+                    ctx.strokeStyle='#FFD60A'; ctx.lineWidth=2.5; ctx.stroke();
                     ctx.beginPath();
-                    traj.forEach((pt, idx) => {
-                        const xCoord = padding + (pt.z / 13.4) * graphW;
-                        const normalizedArea = (pt.area - 0.0015) / (0.0040 - 0.0015);
-                        const yCoord = 15 + graphH - normalizedArea * graphH;
-                        if (idx === 0) ctx.moveTo(xCoord, yCoord);
-                        else ctx.lineTo(xCoord, yCoord);
+                    traj.forEach((pt,idx)=>{
+                        const xc=padding+(pt.z/13.4)*graphW;
+                        const na=(pt.area-0.0015)/(0.0040-0.0015);
+                        const yc=15+graphH-na*graphH;
+                        if(idx===0) ctx.moveTo(xc,yc); else ctx.lineTo(xc,yc);
                     });
-                    ctx.strokeStyle = '#64D2FF';
-                    ctx.lineWidth = 1.8;
-                    ctx.stroke();
-                    ctx.fillStyle = '#86868B';
-                    ctx.font = '10px sans-serif';
-                    ctx.fillText('0m', padding, h - 5);
-                    ctx.fillText('6.7m', padding + graphW/2 - 10, h - 5);
-                    ctx.fillText('13.4m', padding + graphW - 25, h - 5);
+                    ctx.strokeStyle='#64D2FF'; ctx.lineWidth=1.8; ctx.stroke();
+                    ctx.fillStyle='#86868B'; ctx.font='10px sans-serif';
+                    ctx.fillText('0m',padding,h-5);
+                    ctx.fillText('6.7m',padding+graphW/2-10,h-5);
+                    ctx.fillText('13.4m',padding+graphW-25,h-5);
                 };
                 drawEnergy();
-                /* [Bug #5 Fix] ResizeObserver for energy canvas */
-                const resizeObserver = new ResizeObserver(() => { drawEnergy(); });
-                resizeObserver.observe(canvas);
-                return () => { resizeObserver.disconnect(); };
+                const ro = new ResizeObserver(()=>{drawEnergy();}); ro.observe(canvas);
+                return ()=>{ro.disconnect();};
             }, [simulationData]);
-            /* 使用 displayFrame state 取代舊的 progressRef 快照 */
+            /* 隱藏 Loading Screen */
+            useEffect(() => {
+                if (window.__hideLoading) window.__hideLoading();
+            }, []);
             const currentFrame = displayFrame;
             const elasticEnergy = (0.5 * 0.0052 * Math.pow(v0Kmh / 3.6, 2) * (tension / 30)).toFixed(1);
+            /* 📊 雷諾數分析 */
+            const currentRe = currentFrame.reynolds || 0;
+            const reFormatted = currentRe > 1000 ? (currentRe / 1000).toFixed(1) + 'k' : Math.round(currentRe);
+            const flowRegime = currentRe > 200000 ? '完全紊流' : currentRe > 100000 ? '過渡區' : currentRe > 2000 ? '紊流' : '層流';
+            const flowColor = currentRe > 200000 ? '#FF453A' : currentRe > 100000 ? '#FF9F0A' : currentRe > 2000 ? '#FFD60A' : '#30D158';
             return (
                 <div className="flex flex-col min-h-screen px-4 md:px-10 py-6 max-w-[1400px] mx-auto">
                     
@@ -740,33 +899,31 @@
                                 Badminton <span className="text-transparent bg-clip-text bg-gradient-to-r from-white to-[#86868B]">Aero Dynamics</span>
                             </h1>
                             <p className="text-[#86868B] text-xs md:text-sm font-medium">
-                                基於 3D 常微分方程 (ODE) 的羽毛球動態流體力學與氣動彈性形變展示系統
+                                羽球殺球流體力學與世界最快球速分析 — 3D ODE 氣動彈性形變模擬系統
                             </p>
                         </div>
                         <div className="flex items-center gap-3">
-                            <span className="text-xs font-mono text-[#86868B]">系統版本: v3.2 (Stabilized)</span>
+                            <span className="text-xs font-mono text-[#86868B]">v4.0 (Enhanced)</span>
                         </div>
                     </header>
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow mb-6">
                         
+                        {/* ===== 左側面板 ===== */}
                         <div className="lg:col-span-4 flex flex-col gap-6">
                             
                             <div className="flex gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2c2c2e]">
                                 {slides.map((s, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => applySlideSetup(idx)}
-                                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${activeSlide === idx ? 'bg-white text-black font-semibold' : 'text-[#86868B] hover:text-white'}`}
-                                    >
+                                    <button key={idx} onClick={() => applySlideSetup(idx)}
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-all duration-200 ${activeSlide === idx ? 'bg-white text-black font-semibold' : 'text-[#86868B] hover:text-white'}`}>
                                         頁 {idx+1}
                                     </button>
                                 ))}
                             </div>
+                            {/* 理論卡片 */}
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[320px]">
                                 <div className="absolute top-0 right-0 p-6 opacity-5">
                                     <i className={`fa-solid ${slides[activeSlide].icon} text-7xl`}></i>
                                 </div>
-                                
                                 <div>
                                     <div className="flex items-center gap-3 mb-3">
                                         <div className="w-8 h-8 rounded-full bg-[#0A84FF]/10 flex items-center justify-center">
@@ -774,9 +931,7 @@
                                         </div>
                                         <h2 className="text-md font-semibold text-white">{slides[activeSlide].title}</h2>
                                     </div>
-                                    <p className="text-xs text-[#86868B] leading-relaxed mb-4">
-                                        {slides[activeSlide].text}
-                                    </p>
+                                    <p className="text-xs text-[#86868B] leading-relaxed mb-4">{slides[activeSlide].text}</p>
                                     <div className="bg-black/60 rounded-xl p-4 mb-4 border border-white/5 flex items-center justify-center">
                                         <Latex math={slides[activeSlide].formula} block={true} />
                                     </div>
@@ -786,56 +941,46 @@
                                 </div>
                                 <div className="mt-4 pt-3 border-t border-[#2c2c2e] flex justify-between items-center text-xs text-[#86868B]">
                                     <span>👉 同步理論與實體沙盒</span>
-                                    <button 
-                                        onClick={() => applySlideSetup(activeSlide)}
-                                        className="bg-[#0A84FF] hover:bg-[#0071e3] text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-lg shadow-[#0A84FF]/20"
-                                    >
+                                    <button onClick={() => applySlideSetup(activeSlide)}
+                                        className="bg-[#0A84FF] hover:bg-[#0071e3] text-white px-3 py-1.5 rounded-lg font-medium transition-colors shadow-lg shadow-[#0A84FF]/20">
                                         聯動模擬
                                     </button>
                                 </div>
                             </div>
+                            {/* 參數沙盒 */}
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] shadow-xl flex-grow">
                                 <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
                                     <i className="fa-solid fa-sliders text-[#30D158]"></i>
                                     實時物理參數沙盒 (Sandbox)
                                 </h3>
-                                
                                 <div className="space-y-4">
                                     <div>
                                         <div className="flex justify-between items-baseline mb-1">
                                             <span className="text-[#86868B] text-xs font-medium">出球初速 (v₀)</span>
                                             <span className="text-white font-mono font-semibold text-sm">{v0Kmh} <span className="text-[10px] text-[#86868B]">km/h</span></span>
                                         </div>
-                                        <input 
-                                            type="range" min="100" max="600" step="5" value={v0Kmh}
+                                        <input type="range" min="100" max="600" step="5" value={v0Kmh}
                                             onChange={(e) => setV0Kmh(Number(e.target.value))}
-                                            className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#0A84FF]"
-                                        />
+                                            className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#0A84FF]" />
                                     </div>
                                     <div>
                                         <div className="flex justify-between items-baseline mb-1">
                                             <span className="text-[#86868B] text-xs font-medium">拍床張力 (Tension)</span>
                                             <span className="text-white font-mono font-semibold text-sm">{tension} <span className="text-[10px] text-[#86868B]">lbs</span></span>
                                         </div>
-                                        <input 
-                                            type="range" min="20" max="35" step="1" value={tension}
+                                        <input type="range" min="20" max="35" step="1" value={tension}
                                             onChange={(e) => setTension(Number(e.target.value))}
-                                            className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#FF453A]"
-                                        />
+                                            className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#FF453A]" />
                                     </div>
                                     <div>
                                         <span className="text-[#86868B] text-xs font-medium block mb-1">裙襬氣動材質</span>
                                         <div className="flex bg-black rounded-lg p-1 border border-[#2c2c2e]">
-                                            <button 
-                                                onClick={() => setMaterial('natural')}
-                                                className={`flex-1 text-xs py-1.5 rounded-md transition-all ${material === 'natural' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}
-                                            >
+                                            <button onClick={() => setMaterial('natural')}
+                                                className={`flex-1 text-xs py-1.5 rounded-md transition-all ${material === 'natural' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}>
                                                 天然鵝毛 (收縮)
                                             </button>
-                                            <button 
-                                                onClick={() => setMaterial('nylon')}
-                                                className={`flex-1 text-xs py-1.5 rounded-md transition-all ${material === 'nylon' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}
-                                            >
+                                            <button onClick={() => setMaterial('nylon')}
+                                                className={`flex-1 text-xs py-1.5 rounded-md transition-all ${material === 'nylon' ? 'bg-[#2c2c2e] text-white font-medium' : 'text-[#86868B] hover:text-white'}`}>
                                                 尼龍塑膠 (剛性)
                                             </button>
                                         </div>
@@ -843,40 +988,35 @@
                                     <div className="grid grid-cols-2 gap-4 pt-2 border-t border-[#2c2c2e]">
                                         <div>
                                             <label className="text-[10px] text-[#86868B] block mb-1">場地風速: {windSpeed} m/s</label>
-                                            <input 
-                                                type="range" min="0" max="15" value={windSpeed}
+                                            <input type="range" min="0" max="15" value={windSpeed}
                                                 onChange={(e) => setWindSpeed(Number(e.target.value))}
-                                                className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#30D158]"
-                                            />
+                                                className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#30D158]" />
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-[#86868B] block mb-1">風向角度: {windDir}°</label>
-                                            <input 
-                                                type="range" min="0" max="360" value={windDir}
+                                            <input type="range" min="0" max="360" value={windDir}
                                                 onChange={(e) => setWindDir(Number(e.target.value))}
-                                                className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#30D158]"
-                                            />
+                                                className="w-full h-1 bg-[#2c2c2e] rounded-lg appearance-none cursor-pointer accent-[#30D158]" />
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                        {/* ===== 右側 3D 場景 ===== */}
                         <div className="lg:col-span-8 flex flex-col">
-                            
                             <div className="bg-[#1C1C1E] rounded-3xl border border-[#2c2c2e] shadow-2xl relative overflow-hidden flex flex-col flex-grow min-h-[450px]">
-                                
                                 <div className="absolute top-5 left-5 right-5 z-10 flex justify-between items-start">
                                     <div className="flex gap-2 pointer-events-none">
                                         <span className="bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs text-[#86868B] flex items-center gap-2">
                                             <i className="fa-solid fa-cube text-[#0A84FF]"></i> 3D 空間投影 (拖曳旋轉)
                                         </span>
+                                        <span className="bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs text-[#64D2FF] flex items-center gap-2 pointer-events-none">
+                                            <i className="fa-solid fa-water"></i> 流場可視化
+                                        </span>
                                     </div>
-                                    
                                     <div className="flex items-center gap-2">
-                                        <button 
-                                            onClick={handleResetView}
-                                            className="bg-black/60 hover:bg-[#32D74B]/20 backdrop-blur-md border border-white/10 hover:border-[#32D74B]/40 px-3 py-1.5 rounded-full text-xs text-white flex items-center gap-1.5 transition-all active:scale-95 duration-200"
-                                        >
+                                        <button onClick={handleResetView}
+                                            className="bg-black/60 hover:bg-[#32D74B]/20 backdrop-blur-md border border-white/10 hover:border-[#32D74B]/40 px-3 py-1.5 rounded-full text-xs text-white flex items-center gap-1.5 transition-all active:scale-95 duration-200">
                                             <i className="fa-solid fa-rotate-left text-[#32D74B]"></i> 重置視角
                                         </button>
                                         <span className="hidden sm:inline bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-full text-xs font-mono text-[#30D158] pointer-events-none">
@@ -884,20 +1024,14 @@
                                         </span>
                                     </div>
                                 </div>
-                                {/* [Bug #6 Fix] 加入 touch 事件支援 */}
-                                <canvas 
-                                    ref={mainCanvasRef} 
-                                    onMouseDown={handleMouseDown}
-                                    onMouseMove={handleMouseMove}
-                                    onMouseUp={handleMouseUpOrLeave}
-                                    onMouseLeave={handleMouseUpOrLeave}
-                                    onTouchStart={handleTouchStart}
-                                    onTouchMove={handleTouchMove}
-                                    onTouchEnd={handleTouchEnd}
+                                <canvas ref={mainCanvasRef}
+                                    onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUpOrLeave} onMouseLeave={handleMouseUpOrLeave}
+                                    onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                                     className="w-full h-full min-h-[400px] flex-grow cursor-grab active:cursor-grabbing"
-                                    style={{ touchAction: 'none' }}
-                                />
-                                <div className="absolute bottom-5 left-5 right-5 z-10 grid grid-cols-3 gap-4 pointer-events-none">
+                                    style={{ touchAction: 'none' }} />
+                                {/* HUD 面板（含雷諾數） */}
+                                <div className="absolute bottom-5 left-5 right-5 z-10 grid grid-cols-4 gap-3 pointer-events-none">
                                     <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
                                         <div className="text-[#86868B] text-[10px] mb-1 uppercase tracking-wider">瞬時時速</div>
                                         <div className="text-2xl font-mono text-white tracking-tight">
@@ -916,74 +1050,258 @@
                                             {currentFrame.drag.toFixed(1)} <span className="text-[10px] font-sans text-[#86868B]">N</span>
                                         </div>
                                     </div>
+                                    {/* 📊 雷諾數即時面板 */}
+                                    <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
+                                        <div className="text-[#86868B] text-[10px] mb-1 uppercase tracking-wider">雷諾數 Re</div>
+                                        <div className="text-2xl font-mono tracking-tight" style={{color: flowColor}}>
+                                            {reFormatted}
+                                        </div>
+                                        <div className="text-[9px] mt-0.5" style={{color: flowColor}}>{flowRegime}</div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        
-                        <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-lg">
-                            <div>
-                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-4">流體力學數據綜合解析</h3>
-                                <div className="space-y-3 text-sm">
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[#86868B]">初始彈性動能 (Impact)</span>
-                                        <span className="font-mono text-white font-semibold">{elasticEnergy} J</span>
-                                    </div>
-                                    <div className="h-[1px] bg-[#222226]"></div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[#86868B]">空氣阻力極限峰值</span>
-                                        <span className="font-mono text-[#FF453A] font-semibold">{simulationData.maxDrag.toFixed(1)} N</span>
-                                    </div>
-                                    <div className="h-[1px] bg-[#222226]"></div>
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-[#86868B]">穿越球網耗時 (0-6.7m)</span>
-                                        <span className="font-mono text-[#30D158] font-semibold">
-                                            {(simulationData.data.find(d => d.z >= 6.7)?.time || 0).toFixed(4)} s
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex justify-center gap-3 mt-4">
-                                <button 
-                                    onClick={() => setIsPlaying(!isPlaying)}
-                                    className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-slate-200 transition-colors shadow-lg"
-                                >
-                                    {isPlaying ? <i className="fa-solid fa-pause"></i> : <i className="fa-solid fa-play ml-0.5"></i>}
+                    {/* ===== 底部分析面板 ===== */}
+                    <div className="mb-4">
+                        <div className="flex gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2c2c2e] w-fit">
+                            {[
+                                {id:'data', label:'數據解析', icon:'fa-database'},
+                                {id:'charts', label:'衰減圖表', icon:'fa-chart-line'},
+                                {id:'compare', label:'跨運動對比', icon:'fa-ranking-star'},
+                                {id:'feather', label:'羽毛剖面', icon:'fa-feather'},
+                            ].map(tab => (
+                                <button key={tab.id} onClick={() => setAnalysisTab(tab.id)}
+                                    className={`px-4 py-2 text-xs font-medium rounded-lg transition-all duration-200 flex items-center gap-2 ${analysisTab === tab.id ? 'bg-white text-black font-semibold' : 'text-[#86868B] hover:text-white'}`}>
+                                    <i className={`fa-solid ${tab.icon}`}></i> {tab.label}
                                 </button>
-                                <button 
-                                    onClick={() => { progressRef.current = 0; setIsPlaying(true); }}
-                                    className="w-10 h-10 rounded-full bg-[#2c2c2e] text-white flex items-center justify-center hover:bg-[#3a3a3c] transition-colors"
-                                >
-                                    <i className="fa-solid fa-arrow-rotate-left"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">氣動衰減動態特徵</h3>
-                                <div className="flex gap-3 text-[10px]">
-                                    <span className="text-[#BF5AF2] flex items-center gap-1">速度(km/h)</span>
-                                    <span className="text-[#FF453A] flex items-center gap-1">阻力(N)</span>
-                                </div>
-                            </div>
-                            <canvas ref={chartCanvasRef} className="w-full h-full min-h-[130px] flex-grow" />
-                        </div>
-                        <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
-                            <div className="flex justify-between items-center mb-2">
-                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">動能損耗與微觀形變</h3>
-                                <div className="flex gap-3 text-[10px]">
-                                    <span className="text-[#FFD60A] flex items-center gap-1">動能(J)</span>
-                                    <span className="text-[#64D2FF] flex items-center gap-1">裙面積(m²)</span>
-                                </div>
-                            </div>
-                            <canvas ref={energyCanvasRef} className="w-full h-full min-h-[130px] flex-grow" />
+                            ))}
                         </div>
                     </div>
+                    {/* Tab: 數據解析 */}
+                    {analysisTab === 'data' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-lg">
+                                <div>
+                                    <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-4">流體力學數據綜合解析</h3>
+                                    <div className="space-y-3 text-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[#86868B]">初始彈性動能</span>
+                                            <span className="font-mono text-white font-semibold">{elasticEnergy} J</span>
+                                        </div>
+                                        <div className="h-[1px] bg-[#222226]"></div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[#86868B]">阻力極限峰值</span>
+                                            <span className="font-mono text-[#FF453A] font-semibold">{simulationData.maxDrag.toFixed(1)} N</span>
+                                        </div>
+                                        <div className="h-[1px] bg-[#222226]"></div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[#86868B]">穿越球網耗時</span>
+                                            <span className="font-mono text-[#30D158] font-semibold">
+                                                {(simulationData.data.find(d => d.z >= 6.7)?.time || 0).toFixed(4)} s
+                                            </span>
+                                        </div>
+                                        <div className="h-[1px] bg-[#222226]"></div>
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[#86868B]">初始雷諾數</span>
+                                            <span className="font-mono font-semibold" style={{color: flowColor}}>
+                                                {simulationData.data.length > 0 ? (simulationData.data[0].reynolds / 1000).toFixed(0) + 'k' : '—'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-center gap-3 mt-4">
+                                    <button onClick={() => setIsPlaying(!isPlaying)}
+                                        className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-slate-200 transition-colors shadow-lg">
+                                        {isPlaying ? <i className="fa-solid fa-pause"></i> : <i className="fa-solid fa-play ml-0.5"></i>}
+                                    </button>
+                                    <button onClick={() => { progressRef.current = 0; setIsPlaying(true); }}
+                                        className="w-10 h-10 rounded-full bg-[#2c2c2e] text-white flex items-center justify-center hover:bg-[#3a3a3c] transition-colors">
+                                        <i className="fa-solid fa-arrow-rotate-left"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            {/* 📊 雷諾數分析面板 */}
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-chart-area text-[#FF9F0A]"></i> 雷諾數流態分析
+                                </h3>
+                                <div className="bg-black/40 rounded-xl p-4 mb-3 border border-white/5">
+                                    <Latex math="Re = \\frac{\\rho \\cdot v \\cdot D}{\\mu}" block={true} />
+                                </div>
+                                <div className="space-y-2 text-xs flex-grow">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#30D158]"></div>
+                                        <span className="text-[#86868B]">Re &lt; 2,000</span>
+                                        <span className="text-white ml-auto">層流 (Laminar)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#FFD60A]"></div>
+                                        <span className="text-[#86868B]">2k ~ 100k</span>
+                                        <span className="text-white ml-auto">紊流 (Turbulent)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#FF9F0A]"></div>
+                                        <span className="text-[#86868B]">100k ~ 200k</span>
+                                        <span className="text-white ml-auto">過渡區 (Transition)</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#FF453A]"></div>
+                                        <span className="text-[#86868B]">Re &gt; 200,000</span>
+                                        <span className="text-white ml-auto">完全紊流 (Full Turbulence)</span>
+                                    </div>
+                                </div>
+                                <div className="mt-3 pt-3 border-t border-[#2c2c2e] text-[10px] text-[#48484A]">
+                                    ρ=1.225 kg/m³ · D=6.7 cm · μ=1.81×10⁻⁵ Pa·s
+                                </div>
+                            </div>
+                            {/* 即時雷諾數儀表 */}
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg items-center justify-center">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-4 self-start">即時流態儀表</h3>
+                                <div className="relative w-32 h-32 mb-3">
+                                    <svg viewBox="0 0 120 120" className="w-full h-full">
+                                        <circle cx="60" cy="60" r="50" fill="none" stroke="#1C1C1E" strokeWidth="8" />
+                                        <circle cx="60" cy="60" r="50" fill="none" stroke={flowColor} strokeWidth="8"
+                                            strokeDasharray={`${Math.min(currentRe / 400000, 1) * 314} 314`}
+                                            strokeLinecap="round" transform="rotate(-90 60 60)"
+                                            style={{ transition: 'stroke-dasharray 0.3s ease, stroke 0.3s ease' }} />
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                        <span className="text-2xl font-mono font-bold" style={{color: flowColor}}>{reFormatted}</span>
+                                        <span className="text-[10px] text-[#86868B]">Reynolds</span>
+                                    </div>
+                                </div>
+                                <div className="text-sm font-semibold px-3 py-1.5 rounded-full" style={{
+                                    background: flowColor + '15', color: flowColor, border: `1px solid ${flowColor}30`
+                                }}>
+                                    {flowRegime}
+                                </div>
+                                <p className="text-[10px] text-[#48484A] text-center mt-3 leading-relaxed">
+                                    殺球初始 Re 可達 600k+<br/>為完全紊流區域
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                    {/* Tab: 衰減圖表 */}
+                    {analysisTab === 'charts' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">氣動衰減動態特徵</h3>
+                                    <div className="flex gap-3 text-[10px]">
+                                        <span className="text-[#BF5AF2] flex items-center gap-1">● 速度(km/h)</span>
+                                        <span className="text-[#FF453A] flex items-center gap-1">● 阻力(N)</span>
+                                    </div>
+                                </div>
+                                <canvas ref={chartCanvasRef} className="w-full h-full min-h-[180px] flex-grow" />
+                            </div>
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase">動能損耗與微觀形變</h3>
+                                    <div className="flex gap-3 text-[10px]">
+                                        <span className="text-[#FFD60A] flex items-center gap-1">● 動能(J)</span>
+                                        <span className="text-[#64D2FF] flex items-center gap-1">● 裙面積(m²)</span>
+                                    </div>
+                                </div>
+                                <canvas ref={energyCanvasRef} className="w-full h-full min-h-[180px] flex-grow" />
+                            </div>
+                        </div>
+                    )}
+                    {/* Tab: 跨運動球速對比 */}
+                    {analysisTab === 'compare' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-ranking-star text-[#FFD60A]"></i> 世界級初速度對比
+                                </h3>
+                                <SpeedComparisonChart shuttleSpeed={v0Kmh} />
+                                <p className="text-[10px] text-[#48484A] mt-2 text-center">
+                                    拖動左側 v₀ 滑桿即時更新羽球殺球速度對比
+                                </p>
+                            </div>
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-lightbulb text-[#FF9F0A]"></i> 為何羽球殺球是地表最速？
+                                </h3>
+                                <div className="space-y-4 text-xs leading-relaxed flex-grow">
+                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                                        <div className="font-semibold text-white mb-1 flex items-center gap-2">
+                                            <span className="text-[#FF453A]">①</span> 質量極輕
+                                        </div>
+                                        <p className="text-[#86868B]">羽球僅 5.2g，質量僅高爾夫球的 1/9。根據 F=ma，相同力量推動更輕的物體可獲得更高加速度。</p>
+                                    </div>
+                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                                        <div className="font-semibold text-white mb-1 flex items-center gap-2">
+                                            <span className="text-[#FFD60A]">②</span> 人體鞭打效應
+                                        </div>
+                                        <p className="text-[#86868B]">手腕末端線速度可達 130+ km/h，經由槓桿放大與拍面彈性效應，總速度倍增。</p>
+                                    </div>
+                                    <div className="bg-black/30 rounded-xl p-4 border border-white/5">
+                                        <div className="font-semibold text-white mb-1 flex items-center gap-2">
+                                            <span className="text-[#30D158]">③</span> 衰減同樣最快
+                                        </div>
+                                        <p className="text-[#86868B]">巨大的裙狀結構產生的高 Cd 值使球速在 0.6 秒內衰減 80%+。初速極快但到達對方時已大幅減速，使防守成為可能。</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {/* Tab: 羽毛微結構剖面 */}
+                    {analysisTab === 'feather' && (
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-feather text-[#BF5AF2]"></i> 羽毛微結構俯視剖面（即時動畫）
+                                </h3>
+                                <div className="flex-grow flex items-center justify-center bg-black/30 rounded-xl border border-white/5">
+                                    <FeatherCrossSection currentSpeed={currentFrame.speed} material={material} />
+                                </div>
+                                <p className="text-[10px] text-[#48484A] mt-2 text-center">
+                                    {material === 'natural' ? '天然鵝毛：速度越快收縮越明顯' : '尼龍塑膠：形變極小，幾乎剛性'} · 即時反映動畫球速
+                                </p>
+                            </div>
+                            <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
+                                <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-microscope text-[#64D2FF]"></i> 氣動彈性收縮原理
+                                </h3>
+                                <div className="bg-black/40 rounded-xl p-4 mb-4 border border-white/5 flex items-center justify-center">
+                                    <Latex math="A(v) = A_{min} + (A_0 - A_{min}) \cdot e^{-\kappa v^2}" block={true} />
+                                </div>
+                                <div className="space-y-3 text-xs leading-relaxed flex-grow">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-[#FF453A]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <i className="fa-solid fa-bolt text-[#FF453A] text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold text-white mb-0.5">高速階段 (400+ km/h)</div>
+                                            <p className="text-[#86868B]">16 根鵝毛受風壓向內收縮至 A_min ≈ 17 cm²，阻力面積減少 51%，如同子彈穿越空氣。</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-[#30D158]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <i className="fa-solid fa-expand text-[#30D158] text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold text-white mb-0.5">低速階段 (&lt;100 km/h)</div>
+                                            <p className="text-[#86868B]">風壓降低，羽毛自然剛性使裙襬恢復 A₀ ≈ 35 cm²，最大化空氣阻力以穩定落點。</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-lg bg-[#BF5AF2]/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                            <i className="fa-solid fa-circle-xmark text-[#BF5AF2] text-sm"></i>
+                                        </div>
+                                        <div>
+                                            <div className="font-semibold text-white mb-0.5">尼龍球的缺陷</div>
+                                            <p className="text-[#86868B]">剛性塑膠裙無法產生自適應形變，高速時阻力過大、低速時又不夠穩定，飛行特性遠遜天然球。</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             );
         }
-        /* [Bug #1 Fix] 用 ErrorBoundary 包裹 App，防止 render error 導致空白頁 */
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(
             <ErrorBoundary>
