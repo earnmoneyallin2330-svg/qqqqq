@@ -379,6 +379,10 @@
             const defaultPitch = 10; 
             const [cameraYaw, setCameraYaw] = useState(defaultYaw); 
             const [cameraPitch, setCameraPitch] = useState(defaultPitch); 
+            /* ★ 效能關鍵：動畫迴圈透過 ref 讀取相機角度，
+             * 拖曳時不再觸發 useEffect 重建，實現絲滑旋轉 */
+            const cameraYawRef = useRef(defaultYaw);
+            const cameraPitchRef = useRef(defaultPitch);
             
             const [windSpeed, setWindSpeed] = useState(0); 
             const [windDir, setWindDir] = useState(180); 
@@ -476,6 +480,8 @@
                 progressRef.current = 0; 
             };
             const handleResetView = () => {
+                cameraYawRef.current = defaultYaw;
+                cameraPitchRef.current = defaultPitch;
                 setCameraYaw(defaultYaw);
                 setCameraPitch(defaultPitch);
             };
@@ -559,7 +565,18 @@
                     setDisplayFrame({ speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15, reynolds: 0 });
                 }
             }, [simulationData]);
-            /* 相機拖曳事件 */
+            /* 相機拖曳事件 — 直接寫入 ref（零延遲），節流更新 state（給 HUD 顯示用） */
+            const cameraRafRef = useRef(null);
+            const updateCameraState = () => {
+                setCameraYaw(cameraYawRef.current);
+                setCameraPitch(cameraPitchRef.current);
+                cameraRafRef.current = null;
+            };
+            const scheduleStateUpdate = () => {
+                if (!cameraRafRef.current) {
+                    cameraRafRef.current = requestAnimationFrame(updateCameraState);
+                }
+            };
             const handleMouseDown = (e) => {
                 isDraggingRef.current = true;
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
@@ -568,9 +585,10 @@
                 if (!isDraggingRef.current) return;
                 const deltaX = e.clientX - previousMousePosition.current.x;
                 const deltaY = e.clientY - previousMousePosition.current.y;
-                setCameraYaw(prev => Math.max(-90, Math.min(90, prev - deltaX * 0.5)));
-                setCameraPitch(prev => Math.max(5, Math.min(45, prev - deltaY * 0.3)));
+                cameraYawRef.current = Math.max(-90, Math.min(90, cameraYawRef.current - deltaX * 0.5));
+                cameraPitchRef.current = Math.max(5, Math.min(45, cameraPitchRef.current - deltaY * 0.3));
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
+                scheduleStateUpdate();
             };
             const handleMouseUpOrLeave = () => { isDraggingRef.current = false; };
             /* 觸控支援 */
@@ -585,9 +603,10 @@
                 e.preventDefault();
                 const deltaX = e.touches[0].clientX - previousMousePosition.current.x;
                 const deltaY = e.touches[0].clientY - previousMousePosition.current.y;
-                setCameraYaw(prev => Math.max(-90, Math.min(90, prev - deltaX * 0.5)));
-                setCameraPitch(prev => Math.max(5, Math.min(45, prev - deltaY * 0.3)));
+                cameraYawRef.current = Math.max(-90, Math.min(90, cameraYawRef.current - deltaX * 0.5));
+                cameraPitchRef.current = Math.max(5, Math.min(45, cameraPitchRef.current - deltaY * 0.3));
                 previousMousePosition.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                scheduleStateUpdate();
             };
             const handleTouchEnd = () => { isDraggingRef.current = false; };
             /* ============================================================
@@ -617,8 +636,9 @@
                     const scale = width * 0.054;
                     const offsetX = width * 0.5;
                     const offsetY = height * 0.64;
-                    const radYaw = (cameraYaw * Math.PI) / 180;
-                    const radPitch = (cameraPitch * Math.PI) / 180;
+                    /* ★ 從 ref 讀取，不依賴 closure 中的 state */
+                    const radYaw = (cameraYawRef.current * Math.PI) / 180;
+                    const radPitch = (cameraPitchRef.current * Math.PI) / 180;
                     const cz = z - 6.7;
                     let rotX = x * Math.cos(radYaw) - cz * Math.sin(radYaw);
                     let rotZ = x * Math.sin(radYaw) + cz * Math.cos(radYaw);
@@ -786,7 +806,8 @@
                 };
                 render();
                 return () => { cancelAnimationFrame(animationRef.current); resizeObserver.disconnect(); };
-            }, [simulationData, isPlaying, cameraYaw, cameraPitch, windSpeed, windDir]);
+            }, [simulationData, isPlaying, windSpeed, windDir]);
+            /* ★ cameraYaw/cameraPitch 已從依賴移除，動畫迴圈透過 ref 即時讀取 */
             /* 速度/阻力圖表 */
             useEffect(() => {
                 const canvas = chartCanvasRef.current;
