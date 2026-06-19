@@ -25,6 +25,7 @@
             }
         }
     </script>
+
     <style>
         /* Loading Screen */
         #loading-screen {
@@ -45,6 +46,7 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .loading-text { color: #86868B; font-size: 13px; margin-top: 16px; letter-spacing: 0.5px; }
         .loading-error { color: #FF453A; font-size: 14px; margin-top: 20px; max-width: 400px; text-align: center; line-height: 1.6; display: none; }
+
         /* Apple Range Slider styling */
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none;
@@ -64,13 +66,16 @@
     </style>
 </head>
 <body class="bg-black text-[#F5F5F7] min-h-screen overflow-x-hidden antialiased">
+
     <!-- Loading Screen -->
     <div id="loading-screen">
         <div class="loading-spinner"></div>
         <div class="loading-text">正在初始化模擬引擎...</div>
         <div class="loading-error" id="loading-error"></div>
     </div>
+
     <div id="root"></div>
+
     <!-- CDN 載入檢測 + Loading Screen 控制 -->
     <script>
         (function() {
@@ -97,8 +102,10 @@
             };
         })();
     </script>
+
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
         /* ============================================================
          * React Error Boundary — 防止 render error 導致空白頁
          * ============================================================ */
@@ -148,6 +155,7 @@
                 return this.props.children;
             }
         }
+
         function Latex({ math, block = false }) {
             const containerRef = useRef(null);
             useEffect(() => {
@@ -159,17 +167,20 @@
             }, [math, block]);
             return <span ref={containerRef} />;
         }
+
         /* ============================================================
          * 🔬 羽毛微結構收縮剖面動畫元件
          * ============================================================ */
         function FeatherCrossSection({ currentSpeed, material }) {
             const canvasRef = useRef(null);
             const animRef = useRef(null);
+
             useEffect(() => {
                 const canvas = canvasRef.current;
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
+
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
                 canvas.width = rect.width * dpr;
@@ -179,13 +190,17 @@
                 const h = rect.height;
                 const cx = w / 2;
                 const cy = h / 2;
+
                 const numFeathers = 16;
                 const maxRadius = Math.min(w, h) * 0.38;
                 const minRadius = maxRadius * 0.55;
                 const corkRadius = maxRadius * 0.18;
+
                 let animProgress = 0;
+
                 const draw = () => {
                     ctx.clearRect(0, 0, w, h);
+
                     /* 計算收縮比例 */
                     const speedMs = currentSpeed / 3.6;
                     let contractionTarget;
@@ -197,26 +212,31 @@
                     animProgress += (contractionTarget - animProgress) * 0.08;
                     const contraction = animProgress;
                     const currentRadius = maxRadius - (maxRadius - minRadius) * contraction;
+
                     /* 速度標示圓環 */
                     ctx.beginPath();
                     ctx.arc(cx, cy, maxRadius + 6, 0, Math.PI * 2);
                     ctx.strokeStyle = 'rgba(255,255,255,0.06)';
                     ctx.lineWidth = 1;
                     ctx.stroke();
+
                     /* 繪製 16 根羽毛 */
                     for (let i = 0; i < numFeathers; i++) {
                         const baseAngle = (i / numFeathers) * Math.PI * 2 - Math.PI / 2;
                         const inwardAngle = contraction * 0.25;
                         const angle = baseAngle + (i % 2 === 0 ? inwardAngle : -inwardAngle);
                         const featherLen = currentRadius - corkRadius;
+
                         const startX = cx + Math.cos(angle) * corkRadius;
                         const startY = cy + Math.sin(angle) * corkRadius;
                         const endX = cx + Math.cos(angle) * currentRadius;
                         const endY = cy + Math.sin(angle) * currentRadius;
+
                         /* 羽片寬度隨收縮變窄 */
                         const featherWidth = (1 - contraction * 0.6) * 8;
                         const perpX = -Math.sin(angle) * featherWidth;
                         const perpY = Math.cos(angle) * featherWidth;
+
                         /* 羽毛漸層 */
                         const grad = ctx.createLinearGradient(startX, startY, endX, endY);
                         if (material === 'natural') {
@@ -227,6 +247,7 @@
                             grad.addColorStop(0, 'rgba(200, 200, 210, 0.8)');
                             grad.addColorStop(1, 'rgba(150, 150, 160, 0.4)');
                         }
+
                         ctx.beginPath();
                         ctx.moveTo(startX, startY);
                         ctx.quadraticCurveTo(
@@ -241,6 +262,7 @@
                         );
                         ctx.fillStyle = grad;
                         ctx.fill();
+
                         /* 羽軸 */
                         ctx.beginPath();
                         ctx.moveTo(startX, startY);
@@ -249,6 +271,7 @@
                         ctx.lineWidth = 1;
                         ctx.stroke();
                     }
+
                     /* 軟木底座 */
                     const corkGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, corkRadius);
                     corkGrad.addColorStop(0, '#D4A06A');
@@ -260,6 +283,7 @@
                     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
                     ctx.lineWidth = 1;
                     ctx.stroke();
+
                     /* 面積指示環 */
                     ctx.beginPath();
                     ctx.arc(cx, cy, currentRadius, 0, Math.PI * 2);
@@ -268,6 +292,7 @@
                     ctx.setLineDash([4, 4]);
                     ctx.stroke();
                     ctx.setLineDash([]);
+
                     /* 文字標注 */
                     ctx.fillStyle = '#86868B';
                     ctx.font = '10px -apple-system, sans-serif';
@@ -276,21 +301,27 @@
                         ? (17 + (35 - 17) * (1 - contraction)).toFixed(1)
                         : (30.8 + (35 - 30.8) * (1 - contraction * 0.15)).toFixed(1);
                     ctx.fillText(`A = ${areaVal} cm²`, cx, h - 8);
+
                     const contrPct = (contraction * 100).toFixed(0);
                     ctx.fillStyle = contraction > 0.5 ? '#FF453A' : '#30D158';
                     ctx.fillText(`收縮 ${contrPct}%`, cx, 14);
+
                     animRef.current = requestAnimationFrame(draw);
                 };
+
                 draw();
                 return () => cancelAnimationFrame(animRef.current);
             }, [currentSpeed, material]);
+
             return <canvas ref={canvasRef} className="w-full h-full" style={{minHeight:'140px'}} />;
         }
+
         /* ============================================================
          * 🎯 跨運動球速對比圖元件
          * ============================================================ */
         function SpeedComparisonChart({ shuttleSpeed }) {
             const canvasRef = useRef(null);
+
             const sports = [
                 { name: '🏸 羽球殺球', speed: shuttleSpeed, color: '#30D158', dynamic: true },
                 { name: '⛳ 高爾夫開球', speed: 339, color: '#FFD60A', dynamic: false },
@@ -299,11 +330,13 @@
                 { name: '⚾ 棒球快速球', speed: 170, color: '#0A84FF', dynamic: false },
                 { name: '⚽ 足球射門', speed: 131, color: '#64D2FF', dynamic: false },
             ];
+
             useEffect(() => {
                 const canvas = canvasRef.current;
                 if (!canvas) return;
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
+
                 const dpr = window.devicePixelRatio || 1;
                 const rect = canvas.getBoundingClientRect();
                 if (rect.width === 0) return;
@@ -312,6 +345,7 @@
                 ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
                 const w = rect.width;
                 const h = rect.height;
+
                 const sorted = [...sports].sort((a, b) => b.speed - a.speed);
                 const maxSpeed = Math.max(600, shuttleSpeed + 50);
                 const barH = 18;
@@ -319,21 +353,26 @@
                 const labelW = 100;
                 const barAreaW = w - labelW - 60;
                 const startY = 8;
+
                 ctx.clearRect(0, 0, w, h);
+
                 sorted.forEach((s, idx) => {
                     const y = startY + idx * (barH + gap);
                     const barWidth = (s.speed / maxSpeed) * barAreaW;
+
                     /* 標籤 */
                     ctx.fillStyle = s.dynamic ? '#FFFFFF' : '#86868B';
                     ctx.font = `${s.dynamic ? 'bold ' : ''}11px -apple-system, sans-serif`;
                     ctx.textAlign = 'right';
                     ctx.textBaseline = 'middle';
                     ctx.fillText(s.name, labelW - 8, y + barH / 2);
+
                     /* 背景條 */
                     ctx.fillStyle = 'rgba(255,255,255,0.04)';
                     ctx.beginPath();
                     ctx.roundRect(labelW, y, barAreaW, barH, 4);
                     ctx.fill();
+
                     /* 實際速度條 */
                     const grad = ctx.createLinearGradient(labelW, 0, labelW + barWidth, 0);
                     grad.addColorStop(0, s.color + '33');
@@ -342,6 +381,7 @@
                     ctx.beginPath();
                     ctx.roundRect(labelW, y, Math.max(barWidth, 4), barH, 4);
                     ctx.fill();
+
                     /* 發光效果 (動態項目) */
                     if (s.dynamic) {
                         ctx.shadowBlur = 8;
@@ -352,20 +392,25 @@
                         ctx.fill();
                         ctx.shadowBlur = 0;
                     }
+
                     /* 速度數字 */
                     ctx.fillStyle = '#FFFFFF';
                     ctx.font = `${s.dynamic ? 'bold ' : ''}11px -apple-system, monospace`;
                     ctx.textAlign = 'left';
                     ctx.fillText(`${Math.round(s.speed)}`, labelW + barWidth + 6, y + barH / 2);
                 });
+
                 /* km/h 標注 */
                 ctx.fillStyle = '#48484A';
                 ctx.font = '9px -apple-system, sans-serif';
                 ctx.textAlign = 'right';
                 ctx.fillText('km/h', w - 4, startY + sorted.length * (barH + gap) + 4);
+
             }, [shuttleSpeed]);
+
             return <canvas ref={canvasRef} className="w-full" style={{height: '168px'}} />;
         }
+
         /* ============================================================
          * 主應用
          * ============================================================ */
@@ -379,6 +424,7 @@
             const defaultPitch = 10; 
             const [cameraYaw, setCameraYaw] = useState(defaultYaw); 
             const [cameraPitch, setCameraPitch] = useState(defaultPitch); 
+
             /* ★ 效能關鍵：動畫迴圈透過 ref 讀取相機角度，
              * 拖曳時不再觸發 useEffect 重建，實現絲滑旋轉 */
             const cameraYawRef = useRef(defaultYaw);
@@ -386,12 +432,16 @@
             
             const [windSpeed, setWindSpeed] = useState(0); 
             const [windDir, setWindDir] = useState(180); 
+
             const [activeSlide, setActiveSlide] = useState(0);
+
             const [displayFrame, setDisplayFrame] = useState({
-                speed: 565, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15
+                speed: 565, drag: 0, area: 0.0035, z: 2.0, x: 0, y: 3.0
             });
+
             /* 底部分析面板 tab */
             const [analysisTab, setAnalysisTab] = useState('data');
+
             const mainCanvasRef = useRef(null);
             const chartCanvasRef = useRef(null);
             const energyCanvasRef = useRef(null);
@@ -401,6 +451,7 @@
             
             const isDraggingRef = useRef(false);
             const previousMousePosition = useRef({ x: 0, y: 0 });
+
             const windParticlesRef = useRef(null);
             if (windParticlesRef.current === null) {
                 const arr = [];
@@ -414,6 +465,7 @@
                 }
                 windParticlesRef.current = arr;
             }
+
             /* 流場粒子 (3D 場景內) */
             const flowParticlesRef = useRef(null);
             if (flowParticlesRef.current === null) {
@@ -429,6 +481,7 @@
                 }
                 flowParticlesRef.current = arr;
             }
+
             const slides = [
                 {
                     title: "1. 極速彈射與動能特徵",
@@ -471,6 +524,7 @@
                     setup: { v0: 565, tension: 32, material: 'natural' }
                 }
             ];
+
             const applySlideSetup = (slideIndex) => {
                 const conf = slides[slideIndex].setup;
                 setV0Kmh(conf.v0);
@@ -479,12 +533,14 @@
                 setActiveSlide(slideIndex);
                 progressRef.current = 0; 
             };
+
             const handleResetView = () => {
                 cameraYawRef.current = defaultYaw;
                 cameraPitchRef.current = defaultPitch;
                 setCameraYaw(defaultYaw);
                 setCameraPitch(defaultPitch);
             };
+
             /* ============================================================
              * 物理模擬引擎 (ODE Solver)
              * ============================================================ */
@@ -498,51 +554,71 @@
                 const dt = 0.0015;
                 const mu = 1.81e-5; /* 空氣動力黏度 (Pa·s) */
                 const D = 0.067;    /* 羽球特徵直徑 (m) */
+
                 let t = 0;
                 let v_mag = v0Kmh / 3.6; 
-                let angle = -1 * (4 + (v0Kmh / 600) * 12) * (Math.PI / 180); 
+                /* 真實殺球模擬：
+                 * ① 擊球點在中場 (z≈3m)，不是底線 — 殺球是跳起攔截高球
+                 * ② 擊球高度 ~3m（跳殺最高點）
+                 * ③ 下壓角度 15°~22° — 真實殺球角度陡峭
+                 * ④ 距球網僅 ~3.7m，過網後在對面中前場急墜落地 */
+                const rawAngleDeg = 11 + (v0Kmh / 600) * 5; // 11°~16° 的下壓角
+                let angle = -1 * rawAngleDeg * (Math.PI / 180); 
                 let vz = v_mag * Math.cos(angle); 
                 let vy = v_mag * Math.sin(angle); 
                 let vx = 0; 
-                let z = 0, y = 3.15, x = 0; 
+                let z = 2.0, y = 3.0, x = 0;  /* 後場偏中位置起跳殺球 */
+
                 const windRad = (windDir * Math.PI) / 180;
                 const wx = windSpeed * Math.sin(windRad);
                 const wz = windSpeed * Math.cos(windRad);
+
                 const data = [];
                 let maxDrag = 0;
                 let iterations = 0;
                 const MAX_ITERATIONS = 50000;
+
                 while (y >= 0 && z <= 15 && iterations < MAX_ITERATIONS) {
                     iterations++;
+
                     const vrx = vx - wx;
                     const vry = vy;
                     const vrz = vz - wz;
                     /* ★ 除以零防護：Math.max 強制底限 */
                     const vr_mag = Math.max(Math.sqrt(vrx * vrx + vry * vry + vrz * vrz), 0.0001);
+
                     let A = A0;
                     if (material === 'natural') {
                         A = Amin + (A0 - Amin) * Math.exp(-0.00035 * vr_mag * vr_mag);
                     } else {
                         A = A0 * 0.88 + (A0 * 0.12) * Math.exp(-0.00012 * vr_mag * vr_mag);
                     }
+
                     const Fd = 0.5 * rho * vr_mag * vr_mag * Cd_base * A;
                     if (Fd > maxDrag) maxDrag = Fd;
+
                     /* 加速度計算（vr_mag 已有底限保護，不會除以零） */
                     const ax = -(Fd / m) * (vrx / vr_mag);
                     const ay = -g - (Fd / m) * (vry / vr_mag);
                     const az = -(Fd / m) * (vrz / vr_mag);
+
                     vx += ax * dt;
                     vy += ay * dt;
                     vz += az * dt;
                     x += vx * dt;
                     y += vy * dt;
                     z += vz * dt;
+
                     if (isNaN(x) || isNaN(y) || isNaN(z)) break;
+
                     v_mag = Math.sqrt(vx * vx + vy * vy + vz * vz);
                     const kineticEnergy = 0.5 * m * v_mag * v_mag;
+
                     /* 雷諾數計算 Re = ρvD/μ */
                     const Re = (rho * vr_mag * D) / mu;
+
                     t += dt;
+
                     if (Math.floor(t * 10000) % 30 === 0) {
                         data.push({
                             time: t, x, y, z,
@@ -555,6 +631,7 @@
                 }
                 return { data, maxDrag };
             }, [v0Kmh, material, windSpeed, windDir]);
+
             /* 當 simulationData 變化時重置進度 */
             useEffect(() => {
                 progressRef.current = 0;
@@ -562,9 +639,10 @@
                 if (simulationData.data.length > 0) {
                     setDisplayFrame(simulationData.data[0]);
                 } else {
-                    setDisplayFrame({ speed: v0Kmh, drag: 0, area: 0.0035, z: 0, x: 0, y: 3.15, reynolds: 0 });
+                    setDisplayFrame({ speed: v0Kmh, drag: 0, area: 0.0035, z: 2.0, x: 0, y: 3.0, reynolds: 0 });
                 }
             }, [simulationData]);
+
             /* 相機拖曳事件 — 直接寫入 ref（零延遲），節流更新 state（給 HUD 顯示用） */
             const cameraRafRef = useRef(null);
             const updateCameraState = () => {
@@ -577,6 +655,7 @@
                     cameraRafRef.current = requestAnimationFrame(updateCameraState);
                 }
             };
+
             const handleMouseDown = (e) => {
                 isDraggingRef.current = true;
                 previousMousePosition.current = { x: e.clientX, y: e.clientY };
@@ -591,6 +670,7 @@
                 scheduleStateUpdate();
             };
             const handleMouseUpOrLeave = () => { isDraggingRef.current = false; };
+
             /* 觸控支援 */
             const handleTouchStart = (e) => {
                 if (e.touches.length === 1) {
@@ -609,6 +689,7 @@
                 scheduleStateUpdate();
             };
             const handleTouchEnd = () => { isDraggingRef.current = false; };
+
             /* ============================================================
              * 主要 3D Canvas 渲染 (含流場粒子)
              * ============================================================ */
@@ -618,8 +699,10 @@
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
                 const traj = simulationData.data;
+
                 let width = 0, height = 0;
                 const dpr = window.devicePixelRatio || 1;
+
                 const resizeCanvas = () => {
                     const rect = canvas.getBoundingClientRect();
                     if (rect.width === 0 || rect.height === 0) return;
@@ -632,6 +715,7 @@
                 resizeCanvas();
                 const resizeObserver = new ResizeObserver(() => { resizeCanvas(); });
                 resizeObserver.observe(canvas);
+
                 const project = (x, y, z) => {
                     const scale = width * 0.054;
                     const offsetX = width * 0.5;
@@ -652,8 +736,10 @@
                         perspective
                     };
                 };
+
                 const windParticles = windParticlesRef.current;
                 const flowParticles = flowParticlesRef.current;
+
                 const drawWindParticles = () => {
                     ctx.fillStyle = 'rgba(10, 132, 255, 0.15)';
                     const windRad = (windDir * Math.PI) / 180;
@@ -669,10 +755,12 @@
                         ctx.fill();
                     });
                 };
+
                 /* 🌊 流場粒子視覺化 */
                 const drawFlowField = (ballX, ballY, ballZ, speed) => {
                     const intensity = Math.min(speed / 500, 1);
                     if (intensity < 0.05) return;
+
                     flowParticles.forEach(p => {
                         p.life += 0.015 * p.speed;
                         if (p.life > 1) {
@@ -681,18 +769,23 @@
                             p.oy = (Math.random() - 0.5) * (1.2 - intensity * 0.6);
                             p.oz = -0.5 - Math.random() * 1.5;
                         }
+
                         /* 粒子從球前方往後方流動 */
                         const pz = p.oz + p.life * 3;
                         const spread = 1 + p.life * (2 + intensity * 3);
                         const px = p.ox * spread;
                         const py = p.oy * spread;
+
                         const worldX = ballX + px;
                         const worldY = ballY + py;
                         const worldZ = ballZ - pz;
+
                         if (worldZ < 0 || worldZ > 14 || worldY < 0) return;
+
                         const pos = project(worldX, worldY, worldZ);
                         const alpha = (1 - p.life) * intensity * 0.5;
                         const size = (1 + p.life * 2) * pos.perspective;
+
                         /* 壓縮波紋效果 (高速時) */
                         if (intensity > 0.6 && p.life < 0.15) {
                             ctx.strokeStyle = `rgba(255, 69, 58, ${alpha * 0.6})`;
@@ -702,6 +795,7 @@
                                     -Math.PI * 0.3, Math.PI * 0.3);
                             ctx.stroke();
                         }
+
                         /* 流線粒子 */
                         const hue = 200 + p.life * 40;
                         ctx.fillStyle = `hsla(${hue}, 80%, 70%, ${alpha})`;
@@ -710,6 +804,7 @@
                         ctx.fill();
                     });
                 };
+
                 const drawCourt = () => {
                     ctx.shadowBlur = 0;
                     ctx.fillStyle = 'rgba(13, 85, 52, 0.2)';
@@ -719,11 +814,13 @@
                     ctx.moveTo(c1.px,c1.py); ctx.lineTo(c2.px,c2.py);
                     ctx.lineTo(c3.px,c3.py); ctx.lineTo(c4.px,c4.py);
                     ctx.closePath(); ctx.fill();
+
                     ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1.5;
                     ctx.beginPath();
                     ctx.moveTo(c1.px,c1.py); ctx.lineTo(c2.px,c2.py);
                     ctx.lineTo(c3.px,c3.py); ctx.lineTo(c4.px,c4.py);
                     ctx.closePath(); ctx.stroke();
+
                     const lines = [
                         [{x:-2.59,z:0},{x:-2.59,z:13.4}],[{x:2.59,z:0},{x:2.59,z:13.4}],
                         [{x:-3.05,z:1.98},{x:3.05,z:1.98}],[{x:-3.05,z:11.42},{x:3.05,z:11.42}],
@@ -738,6 +835,7 @@
                             if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py);
                         }); ctx.stroke();
                     });
+
                     /* Net */
                     ctx.fillStyle = 'rgba(10,132,255,0.08)'; ctx.strokeStyle = 'rgba(10,132,255,0.25)';
                     ctx.beginPath();
@@ -746,6 +844,7 @@
                     ctx.moveTo(n1.px,n1.py); ctx.lineTo(n2.px,n2.py);
                     ctx.lineTo(n3.px,n3.py); ctx.lineTo(n4.px,n4.py);
                     ctx.closePath(); ctx.fill(); ctx.stroke();
+
                     ctx.strokeStyle = 'rgba(10,132,255,0.04)';
                     for(let i=1;i<10;i++){
                         const r=i/10;
@@ -758,9 +857,11 @@
                     ctx.moveTo(n2.px,n2.py); ctx.lineTo(n3.px,n3.py);
                     ctx.stroke();
                 };
+
                 const drawTrajectory = (idx) => {
                     if (traj.length === 0) return;
                     const maxIdx = Math.max(0, Math.min(idx, traj.length - 1));
+
                     ctx.beginPath();
                     for (let i = 0; i <= maxIdx; i++) {
                         const pt = traj[i];
@@ -771,27 +872,35 @@
                     ctx.strokeStyle = '#30D158'; ctx.lineWidth = 2.5;
                     ctx.shadowBlur = 12; ctx.shadowColor = '#30D158';
                     ctx.stroke(); ctx.shadowBlur = 0;
+
                     const current = traj[maxIdx];
                     if (!current) return;
+
                     /* 🌊 流場粒子 */
                     drawFlowField(current.x, current.y, current.z, current.speed);
+
                     const cPos = project(current.x, current.y, current.z);
                     const sPos = project(current.x, 0, current.z);
+
                     ctx.strokeStyle = 'rgba(255,255,255,0.2)'; ctx.setLineDash([4,4]);
                     ctx.beginPath(); ctx.moveTo(cPos.px,cPos.py); ctx.lineTo(sPos.px,sPos.py);
                     ctx.stroke(); ctx.setLineDash([]);
+
                     ctx.fillStyle = 'rgba(0,0,0,0.6)';
                     ctx.beginPath(); ctx.arc(sPos.px,sPos.py, 6*cPos.perspective, 0, Math.PI*2); ctx.fill();
+
                     ctx.fillStyle = '#FFFFFF'; ctx.shadowBlur = 15; ctx.shadowColor = '#FFFFFF';
                     ctx.beginPath(); ctx.arc(cPos.px,cPos.py, 5*cPos.perspective, 0, Math.PI*2); ctx.fill();
                     ctx.shadowBlur = 0;
                 };
+
                 let lastTime = performance.now();
                 const render = (timestamp) => {
                     const now = timestamp || performance.now();
                     // 限制最大 deltaTime = 0.1 秒，避免切換分頁回來時球瞬間飛走
                     const deltaTime = Math.min((now - lastTime) / 1000, 0.1);
                     lastTime = now;
+
                     if (width===0||height===0) { animationRef.current=requestAnimationFrame(render); return; }
                     ctx.fillStyle = '#070708'; ctx.fillRect(0,0,width,height);
                     drawCourt();
@@ -805,6 +914,7 @@
                     
                     const currentIdx = Math.floor(progressRef.current);
                     drawTrajectory(currentIdx);
+
                     frameCounterRef.current += 1;
                     if (frameCounterRef.current % 6 === 0) {
                         const safeIdx = Math.max(0, Math.min(currentIdx, traj.length - 1));
@@ -813,10 +923,12 @@
                     }
                     animationRef.current = requestAnimationFrame(render);
                 };
+
                 animationRef.current = requestAnimationFrame(render);
                 return () => { cancelAnimationFrame(animationRef.current); resizeObserver.disconnect(); };
             }, [simulationData, isPlaying, windSpeed, windDir]);
             /* ★ cameraYaw/cameraPitch 已從依賴移除，動畫迴圈透過 ref 即時讀取 */
+
             /* 速度/阻力圖表 */
             useEffect(() => {
                 const canvas = chartCanvasRef.current;
@@ -862,6 +974,7 @@
                 const ro = new ResizeObserver(()=>{drawChart();}); ro.observe(canvas);
                 return ()=>{ro.disconnect();};
             }, [simulationData]);
+
             /* 動能/面積圖表 */
             useEffect(() => {
                 const canvas = energyCanvasRef.current;
@@ -908,17 +1021,21 @@
                 const ro = new ResizeObserver(()=>{drawEnergy();}); ro.observe(canvas);
                 return ()=>{ro.disconnect();};
             }, [simulationData]);
+
             /* 隱藏 Loading Screen */
             useEffect(() => {
                 if (window.__hideLoading) window.__hideLoading();
             }, []);
+
             const currentFrame = displayFrame;
             const elasticEnergy = (0.5 * 0.0052 * Math.pow(v0Kmh / 3.6, 2) * (tension / 30)).toFixed(1);
+
             /* 📊 雷諾數分析 */
             const currentRe = currentFrame.reynolds || 0;
             const reFormatted = currentRe > 1000 ? (currentRe / 1000).toFixed(1) + 'k' : Math.round(currentRe);
             const flowRegime = currentRe > 200000 ? '完全紊流' : currentRe > 100000 ? '過渡區' : currentRe > 2000 ? '紊流' : '層流';
             const flowColor = currentRe > 200000 ? '#FF453A' : currentRe > 100000 ? '#FF9F0A' : currentRe > 2000 ? '#FFD60A' : '#30D158';
+
             return (
                 <div className="flex flex-col min-h-screen px-4 md:px-10 py-6 max-w-[1400px] mx-auto">
                     
@@ -936,6 +1053,7 @@
                             <span className="text-xs font-mono text-[#86868B]">v4.0 (Enhanced)</span>
                         </div>
                     </header>
+
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-grow mb-6">
                         
                         {/* ===== 左側面板 ===== */}
@@ -949,6 +1067,7 @@
                                     </button>
                                 ))}
                             </div>
+
                             {/* 理論卡片 */}
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col justify-between shadow-2xl relative overflow-hidden min-h-[320px]">
                                 <div className="absolute top-0 right-0 p-6 opacity-5">
@@ -977,6 +1096,7 @@
                                     </button>
                                 </div>
                             </div>
+
                             {/* 參數沙盒 */}
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] shadow-xl flex-grow">
                                 <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2">
@@ -1032,6 +1152,7 @@
                                 </div>
                             </div>
                         </div>
+
                         {/* ===== 右側 3D 場景 ===== */}
                         <div className="lg:col-span-8 flex flex-col">
                             <div className="bg-[#1C1C1E] rounded-3xl border border-[#2c2c2e] shadow-2xl relative overflow-hidden flex flex-col flex-grow min-h-[450px]">
@@ -1054,12 +1175,14 @@
                                         </span>
                                     </div>
                                 </div>
+
                                 <canvas ref={mainCanvasRef}
                                     onMouseDown={handleMouseDown} onMouseMove={handleMouseMove}
                                     onMouseUp={handleMouseUpOrLeave} onMouseLeave={handleMouseUpOrLeave}
                                     onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}
                                     className="w-full h-full min-h-[400px] flex-grow cursor-grab active:cursor-grabbing"
                                     style={{ touchAction: 'none' }} />
+
                                 {/* HUD 面板（含雷諾數） */}
                                 <div className="absolute bottom-5 left-5 right-5 z-10 grid grid-cols-4 gap-3 pointer-events-none">
                                     <div className="bg-black/50 backdrop-blur-lg border border-white/10 rounded-xl p-3">
@@ -1092,6 +1215,7 @@
                             </div>
                         </div>
                     </div>
+
                     {/* ===== 底部分析面板 ===== */}
                     <div className="mb-4">
                         <div className="flex gap-1 bg-[#1C1C1E] p-1 rounded-xl border border-[#2c2c2e] w-fit">
@@ -1108,6 +1232,7 @@
                             ))}
                         </div>
                     </div>
+
                     {/* Tab: 數據解析 */}
                     {analysisTab === 'data' && (
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1151,6 +1276,7 @@
                                     </button>
                                 </div>
                             </div>
+
                             {/* 📊 雷諾數分析面板 */}
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg">
                                 <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-3 flex items-center gap-2">
@@ -1185,6 +1311,7 @@
                                     ρ=1.225 kg/m³ · D=6.7 cm · μ=1.81×10⁻⁵ Pa·s
                                 </div>
                             </div>
+
                             {/* 即時雷諾數儀表 */}
                             <div className="bg-[#1C1C1E] rounded-2xl p-5 border border-[#2c2c2e] flex flex-col shadow-lg items-center justify-center">
                                 <h3 className="text-xs font-bold text-[#86868B] tracking-widest uppercase mb-4 self-start">即時流態儀表</h3>
@@ -1212,6 +1339,7 @@
                             </div>
                         </div>
                     )}
+
                     {/* Tab: 衰減圖表 */}
                     {analysisTab === 'charts' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1237,6 +1365,7 @@
                             </div>
                         </div>
                     )}
+
                     {/* Tab: 跨運動球速對比 */}
                     {analysisTab === 'compare' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1276,6 +1405,7 @@
                             </div>
                         </div>
                     )}
+
                     {/* Tab: 羽毛微結構剖面 */}
                     {analysisTab === 'feather' && (
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1332,6 +1462,7 @@
                 </div>
             );
         }
+
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(
             <ErrorBoundary>
